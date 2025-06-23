@@ -11,13 +11,13 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     
     Counters.Counter private _tokenIds;
     
-    // 代币价格（以wei为单位）
+    // Token price (in wei)
     uint256 public tokenPrice = 0.01 ether;
     
-    // 最大供应量
+    // Maximum supply
     uint256 public maxSupply = 1000;
     
-    // 代币元数据结构
+    // Token metadata structure
     struct TokenMetadata {
         string name;
         string description;
@@ -28,10 +28,10 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
         uint256 createdAt;
     }
     
-    // 代币ID到元数据的映射
+    // Mapping from token ID to metadata
     mapping(uint256 => TokenMetadata) public tokenMetadata;
     
-    // 事件
+    // Events
     event TokenMinted(uint256 indexed tokenId, address indexed owner, string tokenURI);
     event TokenListed(uint256 indexed tokenId, uint256 price);
     event TokenSold(uint256 indexed tokenId, address indexed seller, address indexed buyer, uint256 price);
@@ -40,12 +40,12 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     constructor() ERC721("Coffee DAO Token", "COFFEE") Ownable(msg.sender) {}
     
     /**
-     * @dev 铸造新代币
-     * @param recipient 接收者地址
-     * @param tokenURI 代币URI
-     * @param name 代币名称
-     * @param description 代币描述
-     * @param image 代币图片URL
+     * @dev Mint a new token
+     * @param recipient Recipient address
+     * @param tokenURI Token URI
+     * @param name Token name
+     * @param description Token description
+     * @param image Token image URL
      */
     function mint(
         address recipient,
@@ -63,7 +63,7 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
         _mint(recipient, newTokenId);
         _setTokenURI(newTokenId, tokenURI);
         
-        // 设置代币元数据
+        // Set token metadata
         tokenMetadata[newTokenId] = TokenMetadata({
             name: name,
             description: description,
@@ -79,9 +79,9 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 列出代币出售
-     * @param tokenId 代币ID
-     * @param price 出售价格
+     * @dev List token for sale
+     * @param tokenId Token ID
+     * @param price Sale price
      */
     function listToken(uint256 tokenId, uint256 price) public {
         require(_exists(tokenId), "Token does not exist");
@@ -95,8 +95,8 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 购买代币
-     * @param tokenId 代币ID
+     * @dev Buy token
+     * @param tokenId Token ID
      */
     function buyToken(uint256 tokenId) public payable {
         require(_exists(tokenId), "Token does not exist");
@@ -107,18 +107,18 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
         address seller = ownerOf(tokenId);
         uint256 price = tokenMetadata[tokenId].price;
         
-        // 转移代币
+        // Transfer token
         _transfer(seller, msg.sender, tokenId);
         
-        // 更新元数据
+        // Update metadata
         tokenMetadata[tokenId].owner = msg.sender;
         tokenMetadata[tokenId].isForSale = false;
         tokenMetadata[tokenId].price = 0;
         
-        // 转移资金
+        // Transfer funds
         payable(seller).transfer(price);
         
-        // 如果有剩余资金，退还给买家
+        // Refund excess funds to buyer
         if (msg.value > price) {
             payable(msg.sender).transfer(msg.value - price);
         }
@@ -127,8 +127,8 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 取消代币出售
-     * @param tokenId 代币ID
+     * @dev Cancel token sale
+     * @param tokenId Token ID
      */
     function cancelSale(uint256 tokenId) public {
         require(_exists(tokenId), "Token does not exist");
@@ -140,9 +140,9 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 更新代币价格
-     * @param tokenId 代币ID
-     * @param newPrice 新价格
+     * @dev Update token price
+     * @param tokenId Token ID
+     * @param newPrice New price
      */
     function updatePrice(uint256 tokenId, uint256 newPrice) public {
         require(_exists(tokenId), "Token does not exist");
@@ -155,8 +155,8 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 获取代币元数据
-     * @param tokenId 代币ID
+     * @dev Get token metadata
+     * @param tokenId Token ID
      */
     function getTokenMetadata(uint256 tokenId) public view returns (TokenMetadata memory) {
         require(_exists(tokenId), "Token does not exist");
@@ -164,7 +164,7 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 获取所有在售代币
+     * @dev Get all tokens for sale
      */
     function getTokensForSale() public view returns (uint256[] memory) {
         uint256[] memory forSale = new uint256[](_tokenIds.current());
@@ -177,7 +177,7 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
             }
         }
         
-        // 调整数组大小
+        // Resize array
         assembly {
             mstore(forSale, count)
         }
@@ -186,8 +186,8 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 获取用户拥有的代币
-     * @param owner 用户地址
+     * @dev Get tokens owned by user
+     * @param owner User address
      */
     function getTokensByOwner(address owner) public view returns (uint256[] memory) {
         uint256[] memory owned = new uint256[](_tokenIds.current());
@@ -200,7 +200,7 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
             }
         }
         
-        // 调整数组大小
+        // Resize array
         assembly {
             mstore(owned, count)
         }
@@ -209,21 +209,21 @@ contract CoffeeToken is ERC721, ERC721URIStorage, Ownable {
     }
     
     /**
-     * @dev 设置代币价格（仅合约拥有者）
-     * @param newPrice 新价格
+     * @dev Set token price (only owner)
+     * @param newPrice New price
      */
     function setTokenPrice(uint256 newPrice) public onlyOwner {
         tokenPrice = newPrice;
     }
     
     /**
-     * @dev 提取合约余额（仅合约拥有者）
+     * @dev Withdraw contract balance (only owner)
      */
     function withdraw() public onlyOwner {
         payable(owner()).transfer(address(this).balance);
     }
     
-    // 重写必要的函数
+    // Override required functions
     function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
         return super.tokenURI(tokenId);
     }

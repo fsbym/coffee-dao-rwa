@@ -5,7 +5,7 @@ import {
   useAccount,
   useContractRead,
   useContractWrite,
-  useWaitForTransaction,
+  useWaitForTransactionReceipt,
 } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "@/lib/web3";
@@ -16,51 +16,51 @@ export function TokenCard({ tokenId, onUpdate }) {
   const [price, setPrice] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
-  // 读取代币元数据
+  // Read token metadata
   const { data: metadata, isLoading } = useContractRead({
-    address: CONTRACT_ADDRESSES.sepolia, // 使用测试网地址
+    address: CONTRACT_ADDRESSES.sepolia, // Use testnet address
     abi: CONTRACT_ABI,
     functionName: "getTokenMetadata",
     args: [tokenId],
   });
 
-  // 读取代币价格
+  // Read token price
   const { data: tokenPrice } = useContractRead({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "tokenPrice",
   });
 
-  // 购买代币
+  // Buy token
   const { write: buyToken, data: buyData } = useContractWrite({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "buyToken",
   });
 
-  // 列出代币出售
+  // List token for sale
   const { write: listToken, data: listData } = useContractWrite({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "listToken",
   });
 
-  // 取消出售
+  // Cancel sale
   const { write: cancelSale, data: cancelData } = useContractWrite({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "cancelSale",
   });
 
-  // 等待交易完成
-  useWaitForTransaction({
+  // Wait for transaction completion
+  useWaitForTransactionReceipt({
     hash: buyData?.hash,
     onSuccess: () => {
       onUpdate?.();
     },
   });
 
-  useWaitForTransaction({
+  useWaitForTransactionReceipt({
     hash: listData?.hash,
     onSuccess: () => {
       setIsEditing(false);
@@ -69,7 +69,7 @@ export function TokenCard({ tokenId, onUpdate }) {
     },
   });
 
-  useWaitForTransaction({
+  useWaitForTransactionReceipt({
     hash: cancelData?.hash,
     onSuccess: () => {
       onUpdate?.();
@@ -114,7 +114,7 @@ export function TokenCard({ tokenId, onUpdate }) {
 
   return (
     <div className="card hover:shadow-lg transition-shadow duration-200">
-      {/* 代币图片 */}
+      {/* Token image */}
       <div className="relative mb-4">
         <img
           src={metadata.image || "/placeholder-coffee.jpg"}
@@ -126,12 +126,12 @@ export function TokenCard({ tokenId, onUpdate }) {
         />
         {isForSale && (
           <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-sm font-medium">
-            在售
+            For Sale
           </div>
         )}
       </div>
 
-      {/* 代币信息 */}
+      {/* Token information */}
       <div className="space-y-3">
         <div>
           <h3 className="text-xl font-semibold text-gray-900 mb-1">
@@ -142,7 +142,7 @@ export function TokenCard({ tokenId, onUpdate }) {
           </p>
         </div>
 
-        {/* 价格信息 */}
+        {/* Price information */}
         {isForSale && metadata.price && (
           <div className="flex items-center gap-2 text-lg font-semibold text-primary-600">
             <Tag className="w-5 h-5" />
@@ -150,7 +150,7 @@ export function TokenCard({ tokenId, onUpdate }) {
           </div>
         )}
 
-        {/* 所有者信息 */}
+        {/* Owner information */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <User className="w-4 h-4" />
           <span className="font-mono">
@@ -158,7 +158,7 @@ export function TokenCard({ tokenId, onUpdate }) {
           </span>
         </div>
 
-        {/* 创建时间 */}
+        {/* Creation time */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Calendar className="w-4 h-4" />
           <span>
@@ -166,19 +166,19 @@ export function TokenCard({ tokenId, onUpdate }) {
           </span>
         </div>
 
-        {/* 操作按钮 */}
+        {/* Action buttons */}
         <div className="pt-4 space-y-2">
           {isOwner ? (
-            // 所有者操作
+            // Owner actions
             <div className="space-y-2">
               {!isForSale ? (
-                // 未在售，可以列出
+                // Not for sale, can list
                 <div className="space-y-2">
                   {isEditing ? (
                     <div className="space-y-2">
                       <input
                         type="number"
-                        placeholder="输入价格 (ETH)"
+                        placeholder="Enter price (ETH)"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         className="input-field"
@@ -191,13 +191,13 @@ export function TokenCard({ tokenId, onUpdate }) {
                           disabled={!price}
                           className="btn-primary flex-1"
                         >
-                          确认出售
+                          Confirm Sale
                         </button>
                         <button
                           onClick={() => setIsEditing(false)}
                           className="btn-secondary flex-1"
                         >
-                          取消
+                          Cancel
                         </button>
                       </div>
                     </div>
@@ -207,19 +207,19 @@ export function TokenCard({ tokenId, onUpdate }) {
                       className="btn-primary w-full"
                     >
                       <Tag className="w-4 h-4 mr-2" />
-                      列出出售
+                      List for Sale
                     </button>
                   )}
                 </div>
               ) : (
-                // 已在售，可以取消
+                // Already for sale, can cancel
                 <button onClick={handleCancel} className="btn-secondary w-full">
-                  取消出售
+                  Cancel Sale
                 </button>
               )}
             </div>
           ) : (
-            // 非所有者操作
+            // Non-owner actions
             isForSale && (
               <button
                 onClick={handleBuy}
@@ -227,7 +227,7 @@ export function TokenCard({ tokenId, onUpdate }) {
                 className="btn-primary w-full"
               >
                 <ShoppingCart className="w-4 h-4 mr-2" />
-                购买代币
+                Buy Token
               </button>
             )
           )}

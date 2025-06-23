@@ -1,48 +1,48 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("开始部署 CoffeeToken 合约...");
+  console.log("Starting CoffeeToken contract deployment...");
 
-  // 获取合约工厂
+  // Get contract factory
   const CoffeeToken = await hre.ethers.getContractFactory("CoffeeToken");
 
-  // 部署合约
+  // Deploy contract
   const coffeeToken = await CoffeeToken.deploy();
 
-  // 等待部署完成
+  // Wait for deployment to complete
   await coffeeToken.waitForDeployment();
 
-  // 获取合约地址
+  // Get contract address
   const address = await coffeeToken.getAddress();
 
-  console.log("✅ CoffeeToken 合约部署成功!");
-  console.log("合约地址:", address);
-  console.log("网络:", hre.network.name);
+  console.log("✅ CoffeeToken contract deployed successfully!");
+  console.log("Contract address:", address);
+  console.log("Network:", hre.network.name);
 
-  // 验证合约（如果支持）
+  // Verify contract (if supported)
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-    console.log("等待区块确认...");
+    console.log("Waiting for block confirmations...");
     await coffeeToken.deploymentTransaction().wait(6);
 
-    console.log("开始验证合约...");
+    console.log("Starting contract verification...");
     try {
       await hre.run("verify:verify", {
         address: address,
         constructorArguments: [],
       });
-      console.log("✅ 合约验证成功!");
+      console.log("✅ Contract verification successful!");
     } catch (error) {
-      console.log("❌ 合约验证失败:", error.message);
+      console.log("❌ Contract verification failed:", error.message);
     }
   }
 
-  console.log("\n📋 部署信息:");
-  console.log("合约名称: CoffeeToken");
-  console.log("合约地址:", address);
-  console.log("网络:", hre.network.name);
-  console.log("部署者:", await hre.ethers.provider.getSigner().getAddress());
+  console.log("\n📋 Deployment Information:");
+  console.log("Contract Name: CoffeeToken");
+  console.log("Contract Address:", address);
+  console.log("Network:", hre.network.name);
+  console.log("Deployer:", await hre.ethers.provider.getSigner().getAddress());
 
-  // 保存部署信息到文件
+  // Save deployment information to file
   const fs = require("fs");
   const deploymentInfo = {
     contractName: "CoffeeToken",
@@ -57,12 +57,14 @@ async function main() {
     JSON.stringify(deploymentInfo, null, 2)
   );
 
-  console.log(`\n📄 部署信息已保存到: deployment-${hre.network.name}.json`);
+  console.log(
+    `\n📄 Deployment information saved to: deployment-${hre.network.name}.json`
+  );
 }
 
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error("❌ 部署失败:", error);
+    console.error("❌ Deployment failed:", error);
     process.exit(1);
   });

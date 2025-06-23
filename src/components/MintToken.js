@@ -5,7 +5,7 @@ import {
   useAccount,
   useContractRead,
   useContractWrite,
-  useWaitForTransaction,
+  useWaitForTransactionReceipt,
 } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "@/lib/web3";
@@ -21,22 +21,22 @@ export function MintToken({ onSuccess }) {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // 读取代币价格
+  // Read token price
   const { data: tokenPrice } = useContractRead({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "tokenPrice",
   });
 
-  // 铸造代币
+  // Mint token
   const { write: mintToken, data: mintData } = useContractWrite({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "mint",
   });
 
-  // 等待交易完成
-  useWaitForTransaction({
+  // Wait for transaction completion
+  useWaitForTransactionReceipt({
     hash: mintData?.hash,
     onSuccess: () => {
       setIsLoading(false);
@@ -74,8 +74,10 @@ export function MintToken({ onSuccess }) {
     return (
       <div className="card text-center">
         <Coffee className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <h3 className="text-lg font-semibold mb-2">连接钱包</h3>
-        <p className="text-gray-600">请先连接钱包来铸造代币</p>
+        <h3 className="text-lg font-semibold mb-2">Connect Wallet</h3>
+        <p className="text-gray-600">
+          Please connect your wallet to mint tokens
+        </p>
       </div>
     );
   }
@@ -87,19 +89,19 @@ export function MintToken({ onSuccess }) {
           <Plus className="w-6 h-6 text-primary-600" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold">铸造新代币</h2>
-          <p className="text-gray-600">创建你的咖啡代币</p>
+          <h2 className="text-xl font-semibold">Mint New Token</h2>
+          <p className="text-gray-600">Create your coffee token</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* 代币名称 */}
+        {/* Token name */}
         <div>
           <label
             htmlFor="name"
             className="block text-sm font-medium text-gray-700 mb-2"
           >
-            代币名称 *
+            Token Name *
           </label>
           <input
             type="text"
@@ -107,39 +109,39 @@ export function MintToken({ onSuccess }) {
             name="name"
             value={formData.name}
             onChange={handleInputChange}
-            placeholder="例如：埃塞俄比亚耶加雪菲"
+            placeholder="e.g., Ethiopian Yirgacheffe"
             className="input-field"
             required
           />
         </div>
 
-        {/* 代币描述 */}
+        {/* Token description */}
         <div>
           <label
             htmlFor="description"
             className="block text-sm font-medium text-gray-700 mb-2"
           >
-            代币描述 *
+            Token Description *
           </label>
           <textarea
             id="description"
             name="description"
             value={formData.description}
             onChange={handleInputChange}
-            placeholder="描述你的咖啡代币..."
+            placeholder="Describe your coffee token..."
             rows="3"
             className="input-field resize-none"
             required
           />
         </div>
 
-        {/* 代币图片 */}
+        {/* Token image */}
         <div>
           <label
             htmlFor="image"
             className="block text-sm font-medium text-gray-700 mb-2"
           >
-            代币图片 URL *
+            Token Image URL *
           </label>
           <input
             type="url"
@@ -173,11 +175,11 @@ export function MintToken({ onSuccess }) {
           />
         </div>
 
-        {/* 价格信息 */}
+        {/* Price information */}
         {tokenPrice && (
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">铸造费用</span>
+              <span className="text-sm text-gray-600">Minting Fee</span>
               <span className="font-semibold text-primary-600">
                 {formatEther(tokenPrice)} ETH
               </span>
@@ -185,7 +187,7 @@ export function MintToken({ onSuccess }) {
           </div>
         )}
 
-        {/* 提交按钮 */}
+        {/* Submit button */}
         <button
           type="submit"
           disabled={
@@ -200,24 +202,24 @@ export function MintToken({ onSuccess }) {
           {isLoading ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              铸造中...
+              Minting...
             </div>
           ) : (
             <div className="flex items-center justify-center">
               <Coffee className="w-4 h-4 mr-2" />
-              铸造代币
+              Mint Token
             </div>
           )}
         </button>
       </form>
 
-      {/* 提示信息 */}
+      {/* Tips */}
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">💡 提示</h4>
+        <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Tips</h4>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• 确保图片URL可以正常访问</li>
-          <li>• Token URI应指向包含元数据的JSON文件</li>
-          <li>• 铸造费用将用于平台维护</li>
+          <li>• Make sure the image URL is accessible</li>
+          <li>• Token URI should point to a JSON file containing metadata</li>
+          <li>• Minting fees are used for platform maintenance</li>
         </ul>
       </div>
     </div>

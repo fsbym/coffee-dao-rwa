@@ -6,7 +6,13 @@ import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "@/lib/web3";
 import { ConnectWallet } from "@/components/ConnectWallet";
 import { TokenCard } from "@/components/TokenCard";
 import { MintToken } from "@/components/MintToken";
-import { Coffee, Home, Plus, ShoppingBag, User } from "lucide-react";
+import {
+  Coffee,
+  Home as HomeIcon,
+  Plus,
+  ShoppingBag,
+  User,
+} from "lucide-react";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -16,14 +22,14 @@ export default function Home() {
   const [allTokens, setAllTokens] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // 获取在售代币
+  // Get tokens for sale
   const { data: forSaleTokens, refetch: refetchForSale } = useContractRead({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
     functionName: "getTokensForSale",
   });
 
-  // 获取用户代币
+  // Get user tokens
   const { data: userTokenIds, refetch: refetchUserTokens } = useContractRead({
     address: CONTRACT_ADDRESSES.sepolia,
     abi: CONTRACT_ABI,
@@ -32,24 +38,24 @@ export default function Home() {
     enabled: !!address,
   });
 
-  // 刷新数据
+  // Refresh data
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
     refetchForSale();
     refetchUserTokens();
   };
 
-  // 处理铸造成功
+  // Handle mint success
   const handleMintSuccess = () => {
     handleRefresh();
   };
 
-  // 处理代币更新
+  // Handle token update
   const handleTokenUpdate = () => {
     handleRefresh();
   };
 
-  // 当数据更新时重新获取
+  // Re-fetch when data updates
   useEffect(() => {
     if (forSaleTokens) {
       setTokensForSale(forSaleTokens);
@@ -62,7 +68,7 @@ export default function Home() {
     }
   }, [userTokenIds, refreshKey]);
 
-  // 合并所有代币用于展示
+  // Merge all tokens for display
   useEffect(() => {
     const all = [...new Set([...tokensForSale, ...userTokens])];
     setAllTokens(all);
@@ -73,8 +79,8 @@ export default function Home() {
       return (
         <div className="text-center py-12">
           <Coffee className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">暂无代币</h3>
-          <p className="text-gray-600">还没有代币被铸造</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Tokens</h3>
+          <p className="text-gray-600">No tokens have been minted yet</p>
         </div>
       );
     }
@@ -94,7 +100,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 导航栏 */}
+      {/* Navigation bar */}
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -108,15 +114,15 @@ export default function Home() {
               </h1>
             </div>
 
-            {/* 钱包连接 */}
+            {/* Wallet connection */}
             <ConnectWallet />
           </div>
         </div>
       </nav>
 
-      {/* 主要内容 */}
+      {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 标签页导航 */}
+        {/* Tab navigation */}
         <div className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm mb-8">
           <button
             onClick={() => setActiveTab("marketplace")}
@@ -126,8 +132,8 @@ export default function Home() {
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            <Home className="w-4 h-4" />
-            市场
+            <HomeIcon className="w-4 h-4" />
+            Marketplace
           </button>
           <button
             onClick={() => setActiveTab("mint")}
@@ -138,7 +144,7 @@ export default function Home() {
             }`}
           >
             <Plus className="w-4 h-4" />
-            铸造
+            Mint
           </button>
           {isConnected && (
             <button
@@ -150,65 +156,71 @@ export default function Home() {
               }`}
             >
               <User className="w-4 h-4" />
-              我的代币
+              My Tokens
             </button>
           )}
         </div>
 
-        {/* 标签页内容 */}
+        {/* Tab content */}
         <div className="space-y-8">
-          {/* 市场页面 */}
+          {/* Marketplace page */}
           {activeTab === "marketplace" && (
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">
-                    咖啡代币市场
+                    Coffee Token Marketplace
                   </h2>
-                  <p className="text-gray-600 mt-1">发现和交易独特的咖啡代币</p>
+                  <p className="text-gray-600 mt-1">
+                    Discover and trade unique coffee tokens
+                  </p>
                 </div>
                 <button onClick={handleRefresh} className="btn-secondary">
-                  刷新
+                  Refresh
                 </button>
               </div>
 
-              {/* 在售代币 */}
+              {/* Tokens for sale */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5" />
-                  在售代币 ({tokensForSale?.length || 0})
+                  Tokens for Sale ({tokensForSale?.length || 0})
                 </h3>
                 {renderTokens(tokensForSale)}
               </div>
 
-              {/* 所有代币 */}
+              {/* All tokens */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Coffee className="w-5 h-5" />
-                  所有代币 ({allTokens?.length || 0})
+                  All Tokens ({allTokens?.length || 0})
                 </h3>
                 {renderTokens(allTokens)}
               </div>
             </div>
           )}
 
-          {/* 铸造页面 */}
+          {/* Mint page */}
           {activeTab === "mint" && (
             <div className="max-w-2xl mx-auto">
               <MintToken onSuccess={handleMintSuccess} />
             </div>
           )}
 
-          {/* 我的代币页面 */}
+          {/* My tokens page */}
           {activeTab === "my-tokens" && isConnected && (
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">我的代币</h2>
-                  <p className="text-gray-600 mt-1">管理你拥有的咖啡代币</p>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    My Tokens
+                  </h2>
+                  <p className="text-gray-600 mt-1">
+                    Manage your coffee tokens
+                  </p>
                 </div>
                 <button onClick={handleRefresh} className="btn-secondary">
-                  刷新
+                  Refresh
                 </button>
               </div>
               {renderTokens(userTokens)}
@@ -217,12 +229,13 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 页脚 */}
+      {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <p className="text-gray-600">
-              © 2024 Coffee DAO RWA. 基于区块链的咖啡代币化平台。
+              © 2024 Coffee DAO RWA. Blockchain-based coffee tokenization
+              platform.
             </p>
           </div>
         </div>

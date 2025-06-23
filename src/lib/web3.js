@@ -3,21 +3,21 @@ import { mainnet, sepolia, localhost } from "wagmi/chains";
 
 export const config = getDefaultConfig({
   appName: "Coffee DAO RWA",
-  projectId: "YOUR_WALLET_CONNECT_PROJECT_ID", // 需要从 WalletConnect 获取
+  projectId: "YOUR_WALLET_CONNECT_PROJECT_ID", // Get from WalletConnect
   chains: [mainnet, sepolia, localhost],
   ssr: true,
 });
 
-// 合约地址配置
+// Contract addresses
 export const CONTRACT_ADDRESSES = {
-  mainnet: "0x...", // 主网合约地址
-  sepolia: "0x...", // 测试网合约地址
-  localhost: "0x...", // 本地合约地址
+  mainnet: "0x...", // Mainnet contract address
+  sepolia: "0x...", // Testnet contract address
+  localhost: "0x...", // Local contract address
 };
 
-// 合约ABI
+// Contract ABI
 export const CONTRACT_ABI = [
-  // ERC721 标准函数
+  // ERC721 standard functions
   {
     inputs: [],
     name: "name",
@@ -46,7 +46,7 @@ export const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // 自定义函数
+  // Custom functions
   {
     inputs: [
       { type: "address" },
@@ -124,7 +124,7 @@ export const CONTRACT_ABI = [
   },
 ];
 
-// 事件
+// Events
 export const CONTRACT_EVENTS = {
   TokenMinted: "TokenMinted",
   TokenListed: "TokenListed",

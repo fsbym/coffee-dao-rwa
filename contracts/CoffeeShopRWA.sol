@@ -54,8 +54,6 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
         uint256 totalVotingPower;   // Total tokens that can vote
         bool executed;
         bool passed;
-        mapping(address => bool) hasVoted;
-        mapping(address => uint256) votingPower; // Voting power used
     }
     
     // Dividend distribution
@@ -65,7 +63,6 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
         uint256 pricePerToken;      // Wei per token
         uint256 timestamp;
         uint256 reportId;           // Link to financial report
-        mapping(address => bool) claimed;
     }
     
     // State variables
@@ -89,6 +86,13 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
     mapping(uint256 => DividendDistribution) public dividendDistributions;
     mapping(address => bool) public authorizedReporters; // Auditors/Oracles
     mapping(address => uint256) public lastDividendClaimed; // Track last claimed distribution
+    
+    // Governance mappings (moved out of struct)
+    mapping(uint256 => mapping(address => bool)) public proposalHasVoted;
+    mapping(uint256 => mapping(address => uint256)) public proposalVotingPower;
+    
+    // Dividend mappings (moved out of struct)
+    mapping(uint256 => mapping(address => bool)) public dividendClaimed;
     
     // Arrays for iteration
     uint256[] public reportIds;
@@ -251,12 +255,13 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
         currentDistributionId++;
         uint256 pricePerToken = msg.value / totalSupply();
         
-        DividendDistribution storage distribution = dividendDistributions[currentDistributionId];
-        distribution.distributionId = currentDistributionId;
-        distribution.totalAmount = msg.value;
-        distribution.pricePerToken = pricePerToken;
-        distribution.timestamp = block.timestamp;
-        distribution.reportId = _reportId;
+        dividendDistributions[currentDistributionId] = DividendDistribution({
+            distributionId: currentDistributionId,
+            totalAmount: msg.value,
+            pricePerToken: pricePerToken,
+            timestamp: block.timestamp,
+            reportId: _reportId
+        });
         
         distributionIds.push(currentDistributionId);
         
@@ -268,14 +273,14 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
      */
     function claimDividend(uint256 _distributionId) external nonReentrant {
         require(_distributionId > 0 && _distributionId <= currentDistributionId, "Invalid distribution ID");
-        DividendDistribution storage distribution = dividendDistributions[_distributionId];
-        require(!distribution.claimed[msg.sender], "Already claimed");
+        require(!dividendClaimed[_distributionId][msg.sender], "Already claimed");
         
         uint256 holderBalance = balanceOf(msg.sender);
         require(holderBalance > 0, "No tokens held");
         
+        DividendDistribution memory distribution = dividendDistributions[_distributionId];
         uint256 dividendAmount = holderBalance * distribution.pricePerToken;
-        distribution.claimed[msg.sender] = true;
+        dividendClaimed[_distributionId][msg.sender] = true;
         
         (bool success, ) = payable(msg.sender).call{value: dividendAmount}("");
         require(success, "Dividend transfer failed");
@@ -292,11 +297,11 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
         require(holderBalance > 0, "No tokens held");
         
         for (uint256 i = lastDividendClaimed[msg.sender] + 1; i <= currentDistributionId; i++) {
-            DividendDistribution storage distribution = dividendDistributions[i];
-            if (!distribution.claimed[msg.sender]) {
+            if (!dividendClaimed[i][msg.sender]) {
+                DividendDistribution memory distribution = dividendDistributions[i];
                 uint256 dividendAmount = holderBalance * distribution.pricePerToken;
                 totalDividends += dividendAmount;
-                distribution.claimed[msg.sender] = true;
+                dividendClaimed[i][msg.sender] = true;
                 emit DividendClaimed(msg.sender, i, dividendAmount);
             }
         }
@@ -323,12 +328,17 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
         currentProposalId++;
         uint256 votingDeadline = block.timestamp + _votingPeriod;
         
-        Proposal storage proposal = proposals[currentProposalId];
-        proposal.id = currentProposalId;
-        proposal.title = _title;
-        proposal.description = _description;
-        proposal.votingDeadline = votingDeadline;
-        proposal.totalVotingPower = totalSupply();
+        proposals[currentProposalId] = Proposal({
+            id: currentProposalId,
+            title: _title,
+            description: _description,
+            votingDeadline: votingDeadline,
+            forVotes: 0,
+            againstVotes: 0,
+            totalVotingPower: totalSupply(),
+            executed: false,
+            passed: false
+        });
         
         proposalIds.push(currentProposalId);
         
@@ -342,13 +352,13 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
     function vote(uint256 _proposalId, bool _support) external validProposal(_proposalId) {
         Proposal storage proposal = proposals[_proposalId];
         require(block.timestamp <= proposal.votingDeadline, "Voting period ended");
-        require(!proposal.hasVoted[msg.sender], "Already voted");
+        require(!proposalHasVoted[_proposalId][msg.sender], "Already voted");
         
         uint256 votingPower = balanceOf(msg.sender);
         require(votingPower > 0, "No voting power");
         
-        proposal.hasVoted[msg.sender] = true;
-        proposal.votingPower[msg.sender] = votingPower;
+        proposalHasVoted[_proposalId][msg.sender] = true;
+        proposalVotingPower[_proposalId][msg.sender] = votingPower;
         
         if (_support) {
             proposal.forVotes += votingPower;
@@ -478,7 +488,7 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
         uint256 holderBalance = balanceOf(_holder);
         
         for (uint256 i = 1; i <= currentDistributionId; i++) {
-            if (!dividendDistributions[i].claimed[_holder]) {
+            if (!dividendClaimed[i][_holder]) {
                 totalUnclaimed += holderBalance * dividendDistributions[i].pricePerToken;
             }
         }
@@ -514,7 +524,7 @@ contract CoffeeShopRWA is ERC20, Ownable, ReentrancyGuard, Pausable {
      * @dev Check if address has voted on proposal
      */
     function hasVoted(uint256 _proposalId, address _voter) external view returns (bool) {
-        return proposals[_proposalId].hasVoted[_voter];
+        return proposalHasVoted[_proposalId][_voter];
     }
     
     /**

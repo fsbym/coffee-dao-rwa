@@ -1,48 +1,28 @@
-require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
+require("@nomicfoundation/hardhat-toolbox");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
     version: "0.8.20",
     settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
+      optimizer: { enabled: true, runs: 200 },
     },
   },
   networks: {
-    // Local development network
-    hardhat: {
-      chainId: 1337,
-    },
-
-    // Testnet configuration
     sepolia: {
+      // Use full URL if provided, otherwise compose from the Alchemy API key
       url:
         process.env.SEPOLIA_URL ||
-        `https://sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+        `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
-    },
-
-    // Mainnet configuration (use with caution)
-    mainnet: {
-      url:
-        process.env.MAINNET_URL ||
-        `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 1,
+      timeout: 120000, // increase timeout to avoid UND_ERR_HEADERS_TIMEOUT
     },
   },
-
-  // Etherscan verification configuration
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
-
-  // Gas reporting
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
     currency: "USD",

@@ -1,56 +1,57 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { sepolia, mainnet } from "wagmi/chains";
+// Native Web3 configuration - no external dependencies needed
 
-// Wallet Connect Project ID
-const projectId =
-  process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "default-project-id";
-
-// Configure chains and providers using RainbowKit's getDefaultConfig
-export const config = getDefaultConfig({
-  appName: "Coffee Shop RWA Platform",
-  projectId,
-  chains: [sepolia, mainnet],
-  ssr: true, // Enable server-side rendering
-});
-
-// Contract ABI for CoffeeShopRWA (ERC-20 based Real World Asset tokenization)
+// Contract ABI for CoffeeShopRWASimple (Simplified ERC-20 based Real World Asset tokenization)
 export const CONTRACT_ABI = [
+  // Constructor
+  {
+    inputs: [
+      { name: "_shopName", type: "string" },
+      { name: "_location", type: "string" },
+      { name: "_description", type: "string" },
+      { name: "_totalValuation", type: "uint256" },
+      { name: "_tokenizedPercentage", type: "uint256" },
+      { name: "_initialTokenSupply", type: "uint256" },
+    ],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+
   // ERC-20 Standard Functions
   {
     inputs: [],
     name: "name",
-    outputs: [{ type: "string" }],
+    outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "symbol",
-    outputs: [{ type: "string" }],
+    outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "totalSupply",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ name: "account", type: "address" }],
     name: "balanceOf",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
       { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     name: "transfer",
-    outputs: [{ type: "bool" }],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -60,17 +61,17 @@ export const CONTRACT_ABI = [
       { name: "spender", type: "address" },
     ],
     name: "allowance",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
       { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     name: "approve",
-    outputs: [{ type: "bool" }],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -78,10 +79,10 @@ export const CONTRACT_ABI = [
     inputs: [
       { name: "from", type: "address" },
       { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
+      { name: "value", type: "uint256" },
     ],
     name: "transferFrom",
-    outputs: [{ type: "bool" }],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -96,7 +97,6 @@ export const CONTRACT_ABI = [
       { name: "description", type: "string" },
       { name: "totalValuation", type: "uint256" },
       { name: "tokenizedPercentage", type: "uint256" },
-      { name: "legalDocumentHash", type: "string" },
       { name: "isVerified", type: "bool" },
     ],
     stateMutability: "view",
@@ -105,98 +105,31 @@ export const CONTRACT_ABI = [
   {
     inputs: [],
     name: "getTokenValue",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
 
-  // Financial Reporting Functions
+  // Purchase Functions
   {
-    inputs: [
-      { name: "_month", type: "uint256" },
-      { name: "_year", type: "uint256" },
-      { name: "_revenue", type: "uint256" },
-      { name: "_expenses", type: "uint256" },
-      { name: "_reportHash", type: "string" },
-    ],
-    name: "submitFinancialReport",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "_reportId", type: "uint256" }],
-    name: "getFinancialReport",
-    outputs: [
-      { name: "month", type: "uint256" },
-      { name: "year", type: "uint256" },
-      { name: "revenue", type: "uint256" },
-      { name: "expenses", type: "uint256" },
-      { name: "netProfit", type: "uint256" },
-      { name: "dividendPool", type: "uint256" },
-      { name: "reportHash", type: "string" },
-      { name: "timestamp", type: "uint256" },
-      { name: "isApproved", type: "bool" },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "_reportId", type: "uint256" }],
-    name: "approveFinancialReport",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "getAllReportIds",
-    outputs: [{ type: "uint256[]" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "currentReportId",
-    outputs: [{ type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-
-  // Dividend Distribution Functions
-  {
-    inputs: [{ name: "_reportId", type: "uint256" }],
-    name: "distributeDividends",
+    inputs: [{ name: "_tokenAmount", type: "uint256" }],
+    name: "buyTokens",
     outputs: [],
     stateMutability: "payable",
     type: "function",
   },
   {
-    inputs: [{ name: "_distributionId", type: "uint256" }],
-    name: "claimDividend",
+    inputs: [{ name: "_newPrice", type: "uint256" }],
+    name: "updateTokenPrice",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [],
-    name: "claimAllDividends",
+    name: "withdraw",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "_holder", type: "address" }],
-    name: "getUnclaimedDividends",
-    outputs: [{ type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "currentDistributionId",
-    outputs: [{ type: "uint256" }],
-    stateMutability: "view",
     type: "function",
   },
 
@@ -208,7 +141,7 @@ export const CONTRACT_ABI = [
       { name: "_votingPeriod", type: "uint256" },
     ],
     name: "createProposal",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -250,31 +183,53 @@ export const CONTRACT_ABI = [
       { name: "_voter", type: "address" },
     ],
     name: "hasVoted",
-    outputs: [{ type: "bool" }],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
-    name: "currentProposalId",
-    outputs: [{ type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "proposalThreshold",
-    outputs: [{ type: "uint256" }],
+    name: "getAllProposalIds",
+    outputs: [{ name: "", type: "uint256[]" }],
     stateMutability: "view",
     type: "function",
   },
 
-  // Admin Functions
+  // Financial Reporting Functions
   {
-    inputs: [{ name: "_legalDocumentHash", type: "string" }],
-    name: "verifyAsset",
+    inputs: [
+      { name: "_month", type: "uint256" },
+      { name: "_year", type: "uint256" },
+      { name: "_revenue", type: "uint256" },
+      { name: "_expenses", type: "uint256" },
+      { name: "_reportHash", type: "string" },
+    ],
+    name: "submitFinancialReport",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_reportId", type: "uint256" }],
+    name: "getFinancialReport",
+    outputs: [
+      { name: "month", type: "uint256" },
+      { name: "year", type: "uint256" },
+      { name: "revenue", type: "uint256" },
+      { name: "expenses", type: "uint256" },
+      { name: "netProfit", type: "uint256" },
+      { name: "reportHash", type: "string" },
+      { name: "timestamp", type: "uint256" },
+      { name: "isApproved", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getAllReportIds",
+    outputs: [{ name: "", type: "uint256[]" }],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -291,6 +246,8 @@ export const CONTRACT_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+
+  // Admin Functions
   {
     inputs: [
       { name: "_to", type: "address" },
@@ -304,7 +261,7 @@ export const CONTRACT_ABI = [
   {
     inputs: [],
     name: "owner",
-    outputs: [{ type: "address" }],
+    outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },
@@ -315,40 +272,61 @@ export const CONTRACT_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  {
-    inputs: [],
-    name: "pause",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "unpause",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
 
   // State Variables (public getters)
   {
     inputs: [],
     name: "maxTotalSupply",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "tokenPrice",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "assetInfo",
+    outputs: [
+      { name: "shopName", type: "string" },
+      { name: "location", type: "string" },
+      { name: "description", type: "string" },
+      { name: "totalValuation", type: "uint256" },
+      { name: "tokenizedPercentage", type: "uint256" },
+      { name: "isVerified", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "currentProposalId",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "currentReportId",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "proposalThreshold",
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ name: "", type: "address" }],
     name: "authorizedReporters",
-    outputs: [{ type: "bool" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "", type: "address" }],
-    name: "lastDividendClaimed",
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
@@ -369,35 +347,20 @@ export const CONTRACT_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, name: "reportId", type: "uint256" },
-      { indexed: false, name: "month", type: "uint256" },
-      { indexed: false, name: "year", type: "uint256" },
-      { indexed: false, name: "revenue", type: "uint256" },
-      { indexed: false, name: "netProfit", type: "uint256" },
-      { indexed: false, name: "reportHash", type: "string" },
-    ],
-    name: "FinancialReportSubmitted",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: "distributionId", type: "uint256" },
-      { indexed: false, name: "totalAmount", type: "uint256" },
-      { indexed: false, name: "pricePerToken", type: "uint256" },
-      { indexed: false, name: "reportId", type: "uint256" },
-    ],
-    name: "DividendDistributed",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: "holder", type: "address" },
-      { indexed: true, name: "distributionId", type: "uint256" },
+      { indexed: true, name: "buyer", type: "address" },
       { indexed: false, name: "amount", type: "uint256" },
+      { indexed: false, name: "totalCost", type: "uint256" },
     ],
-    name: "DividendClaimed",
+    name: "TokensPurchased",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: false, name: "oldPrice", type: "uint256" },
+      { indexed: false, name: "newPrice", type: "uint256" },
+    ],
+    name: "PriceUpdated",
     type: "event",
   },
   {
@@ -433,20 +396,14 @@ export const CONTRACT_ABI = [
   },
   {
     anonymous: false,
-    inputs: [{ indexed: false, name: "legalDocumentHash", type: "string" }],
-    name: "AssetVerified",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [{ indexed: true, name: "reporter", type: "address" }],
-    name: "ReporterAuthorized",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [{ indexed: true, name: "reporter", type: "address" }],
-    name: "ReporterRevoked",
+    inputs: [
+      { indexed: true, name: "reportId", type: "uint256" },
+      { indexed: false, name: "month", type: "uint256" },
+      { indexed: false, name: "year", type: "uint256" },
+      { indexed: false, name: "revenue", type: "uint256" },
+      { indexed: false, name: "netProfit", type: "uint256" },
+    ],
+    name: "FinancialReportSubmitted",
     type: "event",
   },
   // ERC-20 Events
@@ -477,5 +434,10 @@ export const CONTRACT_ADDRESSES = {
   // Update with your deployed contract addresses
   sepolia: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x...", // Update after deployment
   mainnet: "0x...", // Update when deploying to mainnet
-  localhost: "0x...", // For local development
+  localhost:
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3", // For local development
+  hardhat:
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3", // Hardhat network
 };

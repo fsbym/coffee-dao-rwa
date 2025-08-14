@@ -1,16 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  useAccount,
-  useContractRead,
-  useContractWrite,
-  useWaitForTransactionReceipt,
-} from "wagmi";
-import { formatEther, parseEther } from "viem";
-import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "../lib/web3";
+import { ethers } from "ethers";
+import { useWeb3 } from "../components/Web3Context";
 import { ConnectWallet } from "../components/ConnectWallet";
-import { DAOGovernance } from "../components/DAOGovernance";
+import { DAOGovernance } from "../components/DAOGovernanceEthers";
 import {
   Building2,
   DollarSign,
@@ -23,70 +17,118 @@ import {
 } from "lucide-react";
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
+  const { account, isConnected, contractAddress, readContract, writeContract } = useWeb3();
   const [activeTab, setActiveTab] = useState("overview");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Get contract address for current chain
-  const contractAddress = CONTRACT_ADDRESSES.sepolia; // Default to Sepolia for now
+  // Contract data state
+  const [assetInfo, setAssetInfo] = useState(null);
+  const [totalSupply, setTotalSupply] = useState(null);
+  const [tokenBalance, setTokenBalance] = useState(null);
+  const [tokenValue, setTokenValue] = useState(null);
+  const [unclaimedDividends, setUnclaimedDividends] = useState(null);
+  const [currentReportId, setCurrentReportId] = useState(null);
+  const [currentProposalId, setCurrentProposalId] = useState(null);
+  const [contractConnected, setContractConnected] = useState(false);
+  const [buyAmount, setBuyAmount] = useState("");
+  const [buying, setBuying] = useState(false);
+  const [tokenPrice, setTokenPrice] = useState(null);
 
-  // Contract reads
-  const { data: assetInfo } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "getAssetInfo",
-    watch: true,
-  });
+  // Load contract data
+  useEffect(() => {
+    const loadContractData = async () => {
+      try {
+        // Load basic contract data (complete contract)
+        const [assetData, supply, value, reportId, proposalId, price] = await Promise.all([
+          readContract("getAssetInfo"),
+          readContract("totalSupply"),
+          readContract("getTokenValue"),
+          readContract("currentReportId"),
+          readContract("currentProposalId"),
+          readContract("tokenPrice"),
+        ]);
 
-  const { data: tokenBalance } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "balanceOf",
-    args: [address],
-    enabled: !!address,
-    watch: true,
-  });
+        // Use loaded data if available, otherwise use static demo data
+        setAssetInfo(
+          assetData || [
+            "North York Coffee Collective",
+            "5120 Yonge St, North York, Toronto, ON",
+            "Premium artisanal coffee roaster and café serving the North York community",
+            ethers.parseEther("937.5"), // 937.5 ETH
+            5000, // 50%
+            "",
+            true,
+          ]
+        );
 
-  const { data: totalSupply } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "totalSupply",
-    watch: true,
-  });
+        setTotalSupply(supply || ethers.parseEther("468.75"));
+        setTokenValue(value || ethers.parseEther("0.002")); // 1 token = 0.002 ETH
+        setCurrentReportId(reportId || 0);
+        setCurrentProposalId(proposalId || 0);
+        setTokenPrice(price || ethers.parseEther("0.002"));
 
-  const { data: tokenValue } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "getTokenValue",
-    watch: true,
-  });
+        // Check if we got real data from contract
+        setContractConnected(!!assetData && !!supply);
 
-  const { data: unclaimedDividends } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "getUnclaimedDividends",
-    args: [address],
-    enabled: !!address,
-    watch: true,
-  });
+        // Load user-specific data if connected
+        if (isConnected && account) {
+          const balance = await readContract("balanceOf", [account]);
+          setTokenBalance(balance || ethers.parseEther("0")); // User balance
+          setUnclaimedDividends(ethers.parseEther("0")); // No dividends in simplified contract
+        }
+      } catch (error) {
+        console.error("Error loading contract data:", error);
 
-  const { data: currentReportId } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "currentReportId",
-    watch: true,
-  });
+        // Set demo data as fallback
+        setAssetInfo([
+          "North York Coffee Collective",
+          "5120 Yonge St, North York, Toronto, ON",
+          "Premium artisanal coffee roaster and café serving the North York community",
+          ethers.parseEther("937.5"),
+          5000,
+          "",
+          true,
+        ]);
+        setTotalSupply(ethers.parseEther("468750"));
+        setTokenValue(ethers.parseEther("0.002"));
+        setCurrentReportId(3);
+        setCurrentProposalId(2);
+      }
+    };
 
-  const { data: currentProposalId } = useContractRead({
-    address: contractAddress,
-    abi: CONTRACT_ABI,
-    functionName: "currentProposalId",
-    watch: true,
-  });
+    loadContractData();
+  }, [readContract, isConnected, account, refreshTrigger]);
 
   // Refresh function
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleBuyTokens = async () => {
+    if (!writeContract || !buyAmount || !tokenPrice) return;
+
+    try {
+      setBuying(true);
+      const tokensToMint = ethers.parseEther(buyAmount);
+      const totalCost = tokenPrice * BigInt(buyAmount);
+
+      const tx = await writeContract("buyTokens", [tokensToMint], totalCost);
+      console.log("Buy tokens transaction:", tx);
+
+      // Reset form
+      setBuyAmount("");
+      
+      // Reload data after a delay
+      setTimeout(() => {
+        setRefreshTrigger((prev) => prev + 1);
+      }, 3000);
+
+    } catch (error) {
+      console.error("Error buying tokens:", error);
+      alert("Failed to buy tokens: " + error.message);
+    } finally {
+      setBuying(false);
+    }
   };
 
   const tabs = [
@@ -127,6 +169,37 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Network Status Banner */}
+      {!contractConnected && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-yellow-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                <strong>Demo Mode:</strong> Contract not connected. Showing
+                sample data from Brooklyn Roasters Hub.
+                <br />
+                <span className="text-xs">
+                  To see live data: Start Hardhat node and deploy contract.
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Asset Information Card */}
@@ -149,8 +222,8 @@ export default function Home() {
                   Total Valuation
                 </h3>
                 <p className="text-2xl font-bold text-green-600">
-                  {assetInfo[3]
-                    ? `${formatEther(assetInfo[3])} ETH`
+                  {assetInfo && assetInfo[3]
+                    ? `${ethers.formatEther(assetInfo[3])} ETH`
                     : "Loading..."}
                 </p>
                 <p className="text-sm text-gray-500">
@@ -164,7 +237,7 @@ export default function Home() {
                   Token Supply
                 </h3>
                 <p className="text-2xl font-bold text-blue-600">
-                  {totalSupply ? formatEther(totalSupply) : "0"}
+                  {totalSupply ? ethers.formatEther(totalSupply) : "0"}
                 </p>
                 <p className="text-sm text-gray-500">Total Tokens</p>
               </div>
@@ -174,7 +247,9 @@ export default function Home() {
                   Token Value
                 </h3>
                 <p className="text-2xl font-bold text-purple-600">
-                  {tokenValue ? `${formatEther(tokenValue)} ETH` : "0 ETH"}
+                  {tokenValue
+                    ? `${ethers.formatEther(tokenValue)} ETH`
+                    : "0 ETH"}
                 </p>
                 <p className="text-sm text-gray-500">Per Token</p>
               </div>
@@ -238,6 +313,75 @@ export default function Home() {
           </div>
         )}
 
+        {/* Buy Tokens Section (if connected) */}
+        {isConnected && tokenPrice && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-lg p-6 mb-8 border border-blue-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Coins className="h-5 w-5 text-blue-600" />
+              Buy Tokens
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Current Price: {ethers.formatEther(tokenPrice)} ETH per token
+                </p>
+                <p className="text-xs text-gray-500 mb-4">
+                  Need 4.69 tokens minimum to create governance proposals
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Number of tokens to buy
+                    </label>
+                    <input
+                      type="number"
+                      value={buyAmount}
+                      onChange={(e) => setBuyAmount(e.target.value)}
+                      placeholder="e.g. 10"
+                      min="0"
+                      step="0.1"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  {buyAmount && (
+                    <div className="bg-white rounded-lg p-3 border">
+                      <p className="text-sm text-gray-600">
+                        Total Cost: <span className="font-semibold text-blue-600">
+                          {(parseFloat(buyAmount) * parseFloat(ethers.formatEther(tokenPrice))).toFixed(4)} ETH
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center">
+                <button
+                  onClick={handleBuyTokens}
+                  disabled={buying || !buyAmount || parseFloat(buyAmount) <= 0}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg font-medium"
+                >
+                  {buying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Buying...
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="w-5 h-5" />
+                      Buy Tokens
+                    </>
+                  )}
+                </button>
+                {buyAmount && parseFloat(buyAmount) >= 4.69 && (
+                  <p className="text-xs text-green-600 mt-2 text-center">
+                    ✓ Sufficient tokens for governance participation
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Tabs */}
         <div className="bg-white rounded-lg shadow-lg mb-8">
           <div className="border-b border-gray-200">
@@ -276,7 +420,7 @@ export default function Home() {
 
             {activeTab === "dividends" && (
               <DividendsTab
-                address={address}
+                address={account}
                 isConnected={isConnected}
                 contractAddress={contractAddress}
                 unclaimedDividends={unclaimedDividends}
@@ -293,7 +437,7 @@ export default function Home() {
             {activeTab === "governance" && (
               <DAOGovernance
                 contractAddress={contractAddress}
-                contractABI={CONTRACT_ABI}
+                currentProposalId={currentProposalId}
               />
             )}
           </div>
@@ -324,7 +468,7 @@ function OverviewTab({
                 <p className="text-blue-100">Total Supply</p>
                 <p className="text-2xl font-bold">
                   {totalSupply
-                    ? Math.floor(Number(formatEther(totalSupply)))
+                    ? Math.floor(Number(ethers.formatEther(totalSupply)))
                     : 0}
                 </p>
               </div>
@@ -338,7 +482,7 @@ function OverviewTab({
                 <p className="text-green-100">Token Value</p>
                 <p className="text-2xl font-bold">
                   {tokenValue
-                    ? `${Number(formatEther(tokenValue)).toFixed(4)}`
+                    ? `${Number(ethers.formatEther(tokenValue)).toFixed(4)}`
                     : "0.0000"}
                 </p>
               </div>
@@ -420,17 +564,21 @@ function DividendsTab({
   contractAddress,
   unclaimedDividends,
 }) {
-  const { writeContract, data: hash, isPending } = useContractWrite();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const { writeContract } = useWeb3();
+  const [isPending, setIsPending] = useState(false);
 
-  const handleClaimDividends = () => {
-    writeContract({
-      address: contractAddress,
-      abi: CONTRACT_ABI,
-      functionName: "claimAllDividends",
-    });
+  const handleClaimDividends = async () => {
+    try {
+      setIsPending(true);
+      const tx = await writeContract("claimAllDividends");
+      await tx.wait();
+      alert("Dividends claimed successfully!");
+    } catch (error) {
+      console.error("Error claiming dividends:", error);
+      alert("Failed to claim dividends: " + error.message);
+    } finally {
+      setIsPending(false);
+    }
   };
 
   if (!isConnected) {
@@ -456,7 +604,7 @@ function DividendsTab({
               <p className="text-green-100 mb-2">Unclaimed Dividends</p>
               <p className="text-3xl font-bold">
                 {unclaimedDividends
-                  ? `${formatEther(unclaimedDividends)} ETH`
+                  ? `${ethers.formatEther(unclaimedDividends)} ETH`
                   : "0 ETH"}
               </p>
             </div>
@@ -466,12 +614,10 @@ function DividendsTab({
           {unclaimedDividends && Number(unclaimedDividends) > 0 && (
             <button
               onClick={handleClaimDividends}
-              disabled={isPending || isConfirming}
+              disabled={isPending}
               className="mt-4 bg-white text-green-600 px-6 py-2 rounded-lg font-semibold hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending || isConfirming
-                ? "Claiming..."
-                : "Claim All Dividends"}
+              {isPending ? "Claiming..." : "Claim All Dividends"}
             </button>
           )}
         </div>

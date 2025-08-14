@@ -103,9 +103,9 @@ Coffee Shop RWA transforms traditional coffee shop ownership by:
 
 4. **Start development server**
 
-   ```bash
-   npm run dev
-   ```
+```bash
+npm run dev
+```
 
 5. **Open browser**
    Navigate to `http://localhost:3000`

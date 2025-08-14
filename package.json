@@ -1,7 +1,16 @@
 {
-  "name": "coffee-dao-rwa",
-  "version": "0.1.0",
+  "name": "coffee-shop-rwa",
+  "version": "1.0.0",
   "private": true,
+  "description": "Real World Asset tokenization platform for coffee shops",
+  "keywords": [
+    "blockchain",
+    "rwa",
+    "defi",
+    "tokenization",
+    "coffee",
+    "ethereum"
+  ],
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

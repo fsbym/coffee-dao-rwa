@@ -1,245 +1,651 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useContractRead } from "wagmi";
-import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "@/lib/web3";
-import { ConnectWallet } from "@/components/ConnectWallet";
-import { TokenCard } from "@/components/TokenCard";
-import { MintToken } from "@/components/MintToken";
 import {
-  Coffee,
-  Home as HomeIcon,
-  Plus,
-  ShoppingBag,
-  User,
+  useAccount,
+  useContractRead,
+  useContractWrite,
+  useWaitForTransactionReceipt,
+} from "wagmi";
+import { formatEther, parseEther } from "viem";
+import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "../lib/web3";
+import { ConnectWallet } from "../components/ConnectWallet";
+import {
+  Building2,
+  DollarSign,
+  Users,
+  TrendingUp,
+  FileText,
+  Vote,
+  Coins,
+  RefreshCw,
 } from "lucide-react";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
-  const [activeTab, setActiveTab] = useState("marketplace");
-  const [tokensForSale, setTokensForSale] = useState([]);
-  const [userTokens, setUserTokens] = useState([]);
-  const [allTokens, setAllTokens] = useState([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Get tokens for sale
-  const { data: forSaleTokens, refetch: refetchForSale } = useContractRead({
-    address: CONTRACT_ADDRESSES.sepolia,
+  // Get contract address for current chain
+  const contractAddress = CONTRACT_ADDRESSES.sepolia; // Default to Sepolia for now
+
+  // Contract reads
+  const { data: assetInfo } = useContractRead({
+    address: contractAddress,
     abi: CONTRACT_ABI,
-    functionName: "getTokensForSale",
+    functionName: "getAssetInfo",
+    watch: true,
   });
 
-  // Get user tokens
-  const { data: userTokenIds, refetch: refetchUserTokens } = useContractRead({
-    address: CONTRACT_ADDRESSES.sepolia,
+  const { data: tokenBalance } = useContractRead({
+    address: contractAddress,
     abi: CONTRACT_ABI,
-    functionName: "getTokensByOwner",
+    functionName: "balanceOf",
     args: [address],
     enabled: !!address,
+    watch: true,
   });
 
-  // Refresh data
+  const { data: totalSupply } = useContractRead({
+    address: contractAddress,
+    abi: CONTRACT_ABI,
+    functionName: "totalSupply",
+    watch: true,
+  });
+
+  const { data: tokenValue } = useContractRead({
+    address: contractAddress,
+    abi: CONTRACT_ABI,
+    functionName: "getTokenValue",
+    watch: true,
+  });
+
+  const { data: unclaimedDividends } = useContractRead({
+    address: contractAddress,
+    abi: CONTRACT_ABI,
+    functionName: "getUnclaimedDividends",
+    args: [address],
+    enabled: !!address,
+    watch: true,
+  });
+
+  const { data: currentReportId } = useContractRead({
+    address: contractAddress,
+    abi: CONTRACT_ABI,
+    functionName: "currentReportId",
+    watch: true,
+  });
+
+  const { data: currentProposalId } = useContractRead({
+    address: contractAddress,
+    abi: CONTRACT_ABI,
+    functionName: "currentProposalId",
+    watch: true,
+  });
+
+  // Refresh function
   const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
-    refetchForSale();
-    refetchUserTokens();
+    setRefreshTrigger((prev) => prev + 1);
   };
 
-  // Handle mint success
-  const handleMintSuccess = () => {
-    handleRefresh();
-  };
-
-  // Handle token update
-  const handleTokenUpdate = () => {
-    handleRefresh();
-  };
-
-  // Re-fetch when data updates
-  useEffect(() => {
-    if (forSaleTokens) {
-      setTokensForSale(forSaleTokens);
-    }
-  }, [forSaleTokens, refreshKey]);
-
-  useEffect(() => {
-    if (userTokenIds) {
-      setUserTokens(userTokenIds);
-    }
-  }, [userTokenIds, refreshKey]);
-
-  // Merge all tokens for display
-  useEffect(() => {
-    const all = [...new Set([...tokensForSale, ...userTokens])];
-    setAllTokens(all);
-  }, [tokensForSale, userTokens]);
-
-  const renderTokens = (tokenIds) => {
-    if (!tokenIds || tokenIds.length === 0) {
-      return (
-        <div className="text-center py-12">
-          <Coffee className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Tokens</h3>
-          <p className="text-gray-600">No tokens have been minted yet</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {tokenIds.map((tokenId) => (
-          <TokenCard
-            key={tokenId}
-            tokenId={tokenId}
-            onUpdate={handleTokenUpdate}
-          />
-        ))}
-      </div>
-    );
-  };
+  const tabs = [
+    { id: "overview", label: "Overview", icon: Building2 },
+    { id: "dividends", label: "Dividends", icon: DollarSign },
+    { id: "reports", label: "Reports", icon: FileText },
+    { id: "governance", label: "Governance", icon: Vote },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation bar */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-amber-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <Coffee className="w-6 h-6 text-primary-600" />
+            <div className="flex items-center space-x-3">
+              <Building2 className="h-8 w-8 text-amber-600" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  Coffee Shop RWA
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Real World Asset Tokenization
+                </p>
               </div>
-              <h1 className="text-xl font-bold text-gray-900">
-                Coffee DAO RWA
-              </h1>
             </div>
-
-            {/* Wallet connection */}
-            <ConnectWallet />
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleRefresh}
+                className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+                title="Refresh Data"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </button>
+              <ConnectWallet />
+            </div>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab navigation */}
-        <div className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm mb-8">
-          <button
-            onClick={() => setActiveTab("marketplace")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "marketplace"
-                ? "bg-primary-100 text-primary-700"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <HomeIcon className="w-4 h-4" />
-            Marketplace
-          </button>
-          <button
-            onClick={() => setActiveTab("mint")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "mint"
-                ? "bg-primary-100 text-primary-700"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <Plus className="w-4 h-4" />
-            Mint
-          </button>
-          {isConnected && (
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Asset Information Card */}
+        {assetInfo && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Coffee Shop Details
+                </h3>
+                <p className="text-2xl font-bold text-amber-600">
+                  {assetInfo[0]}
+                </p>
+                <p className="text-gray-600">{assetInfo[1]}</p>
+                <p className="text-sm text-gray-500 mt-2">{assetInfo[2]}</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Total Valuation
+                </h3>
+                <p className="text-2xl font-bold text-green-600">
+                  {assetInfo[3]
+                    ? `${formatEther(assetInfo[3])} ETH`
+                    : "Loading..."}
+                </p>
+                <p className="text-sm text-gray-500">
+                  Tokenized:{" "}
+                  {assetInfo[4] ? `${Number(assetInfo[4]) / 100}%` : "0%"}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Token Supply
+                </h3>
+                <p className="text-2xl font-bold text-blue-600">
+                  {totalSupply ? formatEther(totalSupply) : "0"}
+                </p>
+                <p className="text-sm text-gray-500">Total Tokens</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Token Value
+                </h3>
+                <p className="text-2xl font-bold text-purple-600">
+                  {tokenValue ? `${formatEther(tokenValue)} ETH` : "0 ETH"}
+                </p>
+                <p className="text-sm text-gray-500">Per Token</p>
+              </div>
+            </div>
+
+            {assetInfo[6] && (
+              <div className="mt-4 flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-green-700 font-medium">
+                  Asset Verified
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* User Portfolio (if connected) */}
+        {isConnected && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Your Portfolio
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <Coins className="h-5 w-5 text-blue-600" />
+                  <span className="text-gray-700">Token Holdings</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-600">
+                  {tokenBalance ? formatEther(tokenBalance) : "0"}
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <span className="text-gray-700">Portfolio Value</span>
+                </div>
+                <p className="text-2xl font-bold text-green-600">
+                  {tokenBalance && tokenValue
+                    ? `${formatEther(
+                        (BigInt(tokenBalance) * BigInt(tokenValue)) /
+                          BigInt(10 ** 18)
+                      )} ETH`
+                    : "0 ETH"}
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="h-5 w-5 text-purple-600" />
+                  <span className="text-gray-700">Unclaimed Dividends</span>
+                </div>
+                <p className="text-2xl font-bold text-purple-600">
+                  {unclaimedDividends
+                    ? `${formatEther(unclaimedDividends)} ETH`
+                    : "0 ETH"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Tabs */}
+        <div className="bg-white rounded-lg shadow-lg mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 px-6">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
+                      activeTab === tab.id
+                        ? "border-amber-500 text-amber-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-6">
+            {activeTab === "overview" && (
+              <OverviewTab
+                assetInfo={assetInfo}
+                totalSupply={totalSupply}
+                tokenValue={tokenValue}
+                currentReportId={currentReportId}
+                currentProposalId={currentProposalId}
+              />
+            )}
+
+            {activeTab === "dividends" && (
+              <DividendsTab
+                address={address}
+                isConnected={isConnected}
+                contractAddress={contractAddress}
+                unclaimedDividends={unclaimedDividends}
+              />
+            )}
+
+            {activeTab === "reports" && (
+              <ReportsTab
+                contractAddress={contractAddress}
+                currentReportId={currentReportId}
+              />
+            )}
+
+            {activeTab === "governance" && (
+              <GovernanceTab
+                address={address}
+                isConnected={isConnected}
+                contractAddress={contractAddress}
+                currentProposalId={currentProposalId}
+                tokenBalance={tokenBalance}
+              />
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// Overview Tab Component
+function OverviewTab({
+  assetInfo,
+  totalSupply,
+  tokenValue,
+  currentReportId,
+  currentProposalId,
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Platform Statistics
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100">Total Supply</p>
+                <p className="text-2xl font-bold">
+                  {totalSupply
+                    ? Math.floor(Number(formatEther(totalSupply)))
+                    : 0}
+                </p>
+              </div>
+              <Coins className="h-8 w-8 text-blue-200" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100">Token Value</p>
+                <p className="text-2xl font-bold">
+                  {tokenValue
+                    ? `${Number(formatEther(tokenValue)).toFixed(4)}`
+                    : "0.0000"}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-green-200" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100">Reports</p>
+                <p className="text-2xl font-bold">
+                  {currentReportId ? Number(currentReportId) : 0}
+                </p>
+              </div>
+              <FileText className="h-8 w-8 text-purple-200" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100">Proposals</p>
+                <p className="text-2xl font-bold">
+                  {currentProposalId ? Number(currentProposalId) : 0}
+                </p>
+              </div>
+              <Vote className="h-8 w-8 text-orange-200" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          About Coffee Shop RWA
+        </h3>
+        <div className="prose max-w-none">
+          <p className="text-gray-600 mb-4">
+            Coffee Shop RWA is a revolutionary platform that enables real-world
+            asset tokenization for coffee shops. By purchasing tokens, you
+            become a shareholder in the actual coffee shop business and receive
+            dividends from the shop's profits.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-2">
+                Key Benefits:
+              </h4>
+              <ul className="list-disc list-inside text-gray-600 space-y-1">
+                <li>Receive monthly dividend payments</li>
+                <li>Participate in governance decisions</li>
+                <li>Trade tokens on secondary markets</li>
+                <li>Transparent financial reporting</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-2">
+                How It Works:
+              </h4>
+              <ul className="list-disc list-inside text-gray-600 space-y-1">
+                <li>Coffee shop tokenizes part of their business</li>
+                <li>Investors buy tokens representing ownership</li>
+                <li>Monthly profits are distributed as dividends</li>
+                <li>Token holders vote on major decisions</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Dividends Tab Component
+function DividendsTab({
+  address,
+  isConnected,
+  contractAddress,
+  unclaimedDividends,
+}) {
+  const { writeContract, data: hash, isPending } = useContractWrite();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const handleClaimDividends = () => {
+    writeContract({
+      address: contractAddress,
+      abi: CONTRACT_ABI,
+      functionName: "claimAllDividends",
+    });
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="text-center py-8">
+        <DollarSign className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600">
+          Connect your wallet to view and claim dividends
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Your Dividends
+        </h3>
+        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-100 mb-2">Unclaimed Dividends</p>
+              <p className="text-3xl font-bold">
+                {unclaimedDividends
+                  ? `${formatEther(unclaimedDividends)} ETH`
+                  : "0 ETH"}
+              </p>
+            </div>
+            <DollarSign className="h-12 w-12 text-green-200" />
+          </div>
+
+          {unclaimedDividends && Number(unclaimedDividends) > 0 && (
             <button
-              onClick={() => setActiveTab("my-tokens")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === "my-tokens"
-                  ? "bg-primary-100 text-primary-700"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              onClick={handleClaimDividends}
+              disabled={isPending || isConfirming}
+              className="mt-4 bg-white text-green-600 px-6 py-2 rounded-lg font-semibold hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <User className="w-4 h-4" />
-              My Tokens
+              {isPending || isConfirming
+                ? "Claiming..."
+                : "Claim All Dividends"}
             </button>
           )}
         </div>
+      </div>
 
-        {/* Tab content */}
-        <div className="space-y-8">
-          {/* Marketplace page */}
-          {activeTab === "marketplace" && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Coffee Token Marketplace
-                  </h2>
-                  <p className="text-gray-600 mt-1">
-                    Discover and trade unique coffee tokens
-                  </p>
-                </div>
-                <button onClick={handleRefresh} className="btn-secondary">
-                  Refresh
-                </button>
-              </div>
+      <div>
+        <h4 className="text-md font-semibold text-gray-900 mb-4">
+          Dividend Information
+        </h4>
+        <div className="prose max-w-none text-gray-600">
+          <p>
+            Dividends are distributed monthly based on the coffee shop's
+            profits. The amount you receive depends on how many tokens you hold
+            relative to the total supply.
+          </p>
+          <p className="mt-4">
+            All dividend distributions are automatically calculated and can be
+            claimed at any time. There's no deadline to claim your dividends -
+            they remain available until you claim them.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-              {/* Tokens for sale */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <ShoppingBag className="w-5 h-5" />
-                  Tokens for Sale ({tokensForSale?.length || 0})
-                </h3>
-                {renderTokens(tokensForSale)}
-              </div>
-
-              {/* All tokens */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Coffee className="w-5 h-5" />
-                  All Tokens ({allTokens?.length || 0})
-                </h3>
-                {renderTokens(allTokens)}
-              </div>
-            </div>
-          )}
-
-          {/* Mint page */}
-          {activeTab === "mint" && (
-            <div className="max-w-2xl mx-auto">
-              <MintToken onSuccess={handleMintSuccess} />
-            </div>
-          )}
-
-          {/* My tokens page */}
-          {activeTab === "my-tokens" && isConnected && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    My Tokens
-                  </h2>
-                  <p className="text-gray-600 mt-1">
-                    Manage your coffee tokens
-                  </p>
-                </div>
-                <button onClick={handleRefresh} className="btn-secondary">
-                  Refresh
-                </button>
-              </div>
-              {renderTokens(userTokens)}
-            </div>
-          )}
+// Reports Tab Component
+function ReportsTab({ contractAddress, currentReportId }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Financial Reports
+        </h3>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <FileText className="h-5 w-5 text-blue-600" />
+            <span className="font-medium text-blue-900">Latest Report</span>
+          </div>
+          <p className="text-blue-700">
+            Report #{currentReportId ? Number(currentReportId) : 0} available
+          </p>
+          <p className="text-sm text-blue-600 mt-2">
+            Financial reports are submitted monthly and include revenue,
+            expenses, and profit distribution details.
+          </p>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <p className="text-gray-600">
-              © 2024 Coffee DAO RWA. Blockchain-based coffee tokenization
-              platform.
+      <div>
+        <h4 className="text-md font-semibold text-gray-900 mb-4">
+          Report Features
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h5 className="font-medium text-gray-900 mb-2">
+              Monthly Reporting
+            </h5>
+            <p className="text-sm text-gray-600">
+              Detailed monthly financial statements including revenue, expenses,
+              and net profit calculations.
+            </p>
+          </div>
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h5 className="font-medium text-gray-900 mb-2">
+              Transparent Auditing
+            </h5>
+            <p className="text-sm text-gray-600">
+              All reports are verified by authorized auditors before dividend
+              distribution.
             </p>
           </div>
         </div>
-      </footer>
+      </div>
+    </div>
+  );
+}
+
+// Governance Tab Component
+function GovernanceTab({
+  address,
+  isConnected,
+  contractAddress,
+  currentProposalId,
+  tokenBalance,
+}) {
+  if (!isConnected) {
+    return (
+      <div className="text-center py-8">
+        <Vote className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600">
+          Connect your wallet to participate in governance
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Governance Overview
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <Vote className="h-5 w-5 text-purple-600" />
+              <span className="font-medium text-purple-900">
+                Your Voting Power
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-purple-700">
+              {tokenBalance ? formatEther(tokenBalance) : "0"}
+            </p>
+            <p className="text-sm text-purple-600">Tokens = Votes</p>
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <FileText className="h-5 w-5 text-orange-600" />
+              <span className="font-medium text-orange-900">
+                Active Proposals
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-orange-700">
+              {currentProposalId ? Number(currentProposalId) : 0}
+            </p>
+            <p className="text-sm text-orange-600">Total Proposals</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-md font-semibold text-gray-900 mb-4">
+          How Governance Works
+        </h4>
+        <div className="prose max-w-none text-gray-600">
+          <p>
+            Token holders can participate in governance by creating and voting
+            on proposals that affect the coffee shop's operations and the
+            platform's parameters.
+          </p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h5 className="font-medium text-gray-900 mb-2">
+                Create Proposals
+              </h5>
+              <p className="text-sm text-gray-600">
+                Token holders with sufficient tokens can create proposals for
+                major decisions.
+              </p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h5 className="font-medium text-gray-900 mb-2">
+                Vote on Decisions
+              </h5>
+              <p className="text-sm text-gray-600">
+                Use your tokens to vote on proposals during the voting period.
+              </p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h5 className="font-medium text-gray-900 mb-2">
+                Execute Results
+              </h5>
+              <p className="text-sm text-gray-600">
+                Approved proposals are automatically executed after the voting
+                period.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

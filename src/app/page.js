@@ -10,6 +10,7 @@ import {
 import { formatEther, parseEther } from "viem";
 import { CONTRACT_ABI, CONTRACT_ADDRESSES } from "../lib/web3";
 import { ConnectWallet } from "../components/ConnectWallet";
+import { DAOGovernance } from "../components/DAOGovernance";
 import {
   Building2,
   DollarSign,
@@ -290,12 +291,9 @@ export default function Home() {
             )}
 
             {activeTab === "governance" && (
-              <GovernanceTab
-                address={address}
-                isConnected={isConnected}
+              <DAOGovernance
                 contractAddress={contractAddress}
-                currentProposalId={currentProposalId}
-                tokenBalance={tokenBalance}
+                contractABI={CONTRACT_ABI}
               />
             )}
           </div>
@@ -545,104 +543,6 @@ function ReportsTab({ contractAddress, currentReportId }) {
               All reports are verified by authorized auditors before dividend
               distribution.
             </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Governance Tab Component
-function GovernanceTab({
-  address,
-  isConnected,
-  contractAddress,
-  currentProposalId,
-  tokenBalance,
-}) {
-  if (!isConnected) {
-    return (
-      <div className="text-center py-8">
-        <Vote className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600">
-          Connect your wallet to participate in governance
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Governance Overview
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <Vote className="h-5 w-5 text-purple-600" />
-              <span className="font-medium text-purple-900">
-                Your Voting Power
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-purple-700">
-              {tokenBalance ? formatEther(tokenBalance) : "0"}
-            </p>
-            <p className="text-sm text-purple-600">Tokens = Votes</p>
-          </div>
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <FileText className="h-5 w-5 text-orange-600" />
-              <span className="font-medium text-orange-900">
-                Active Proposals
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-orange-700">
-              {currentProposalId ? Number(currentProposalId) : 0}
-            </p>
-            <p className="text-sm text-orange-600">Total Proposals</p>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <h4 className="text-md font-semibold text-gray-900 mb-4">
-          How Governance Works
-        </h4>
-        <div className="prose max-w-none text-gray-600">
-          <p>
-            Token holders can participate in governance by creating and voting
-            on proposals that affect the coffee shop's operations and the
-            platform's parameters.
-          </p>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h5 className="font-medium text-gray-900 mb-2">
-                Create Proposals
-              </h5>
-              <p className="text-sm text-gray-600">
-                Token holders with sufficient tokens can create proposals for
-                major decisions.
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h5 className="font-medium text-gray-900 mb-2">
-                Vote on Decisions
-              </h5>
-              <p className="text-sm text-gray-600">
-                Use your tokens to vote on proposals during the voting period.
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h5 className="font-medium text-gray-900 mb-2">
-                Execute Results
-              </h5>
-              <p className="text-sm text-gray-600">
-                Approved proposals are automatically executed after the voting
-                period.
-              </p>
-            </div>
           </div>
         </div>
       </div>

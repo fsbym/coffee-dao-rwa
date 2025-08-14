@@ -1,0 +1,597 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "./CoffeeShopRWA.sol";
+
+/**
+ * @title CoffeeShopDAO
+ * @dev Enhanced DAO governance system for Coffee Shop RWA
+ * Features:
+ * - Comprehensive proposal types
+ * - Voting delegation
+ * - Quorum requirements
+ * - Time-lock execution
+ * - Emergency veto mechanism
+ */
+contract CoffeeShopDAO is CoffeeShopRWA {
+    
+    // Enhanced proposal types
+    enum ProposalType {
+        Financial,      // Budget, dividends, investments
+        Operational,    // Daily operations, menu, hours
+        Strategic,      // Expansion, partnerships, branding
+        Governance,     // DAO parameters, voting rules
+        Emergency       // Crisis management, force majeure
+    }
+    
+    // Proposal urgency levels
+    enum ProposalUrgency {
+        Low,        // 14 days voting period
+        Medium,     // 7 days voting period  
+        High,       // 3 days voting period
+        Emergency   // 24 hours voting period
+    }
+    
+    // Enhanced proposal structure
+    struct DAOProposal {
+        uint256 id;
+        address proposer;
+        ProposalType proposalType;
+        ProposalUrgency urgency;
+        string title;
+        string description;
+        string detailsHash;         // IPFS hash for detailed proposal
+        uint256 requestedAmount;    // ETH amount if financial proposal
+        address targetAddress;      // Contract address for execution
+        bytes callData;            // Function call data for execution
+        uint256 createdAt;
+        uint256 votingDeadline;
+        uint256 executionDeadline;
+        uint256 forVotes;
+        uint256 againstVotes;
+        uint256 abstainVotes;
+        uint256 totalVotingPower;  // Total tokens when proposal created
+        uint256 quorumRequired;    // Required quorum percentage
+        bool executed;
+        bool cancelled;
+        bool vetoed;
+        ProposalStatus status;
+    }
+    
+    enum ProposalStatus {
+        Active,
+        Succeeded,
+        Defeated,
+        Executed,
+        Cancelled,
+        Vetoed
+    }
+    
+    // Voting delegation
+    struct VotingDelegation {
+        address delegate;
+        uint256 delegatedPower;
+        uint256 delegatedAt;
+        bool isActive;
+    }
+    
+    // Governance parameters
+    struct GovernanceConfig {
+        uint256 proposalThreshold;        // Min tokens to create proposal (basis points)
+        uint256 quorumThreshold;          // Min participation for valid vote (basis points)
+        uint256 superMajorityThreshold;   // For critical decisions (basis points)
+        uint256 vetoThreshold;           // For emergency veto (basis points)
+        uint256 timeLockDelay;           // Delay before execution (seconds)
+        uint256 votingDelay;             // Delay before voting starts (seconds)
+        uint256 maxProposalsPerUser;     // Max active proposals per user
+        bool delegationEnabled;          // Whether delegation is allowed
+    }
+    
+    // State variables
+    GovernanceConfig public governanceConfig;
+    uint256 public proposalCount;
+    
+    // Mappings
+    mapping(uint256 => DAOProposal) public daoProposals;
+    mapping(uint256 => mapping(address => bool)) public hasVotedOnProposal;
+    mapping(uint256 => mapping(address => uint256)) public votingPowerUsed;
+    mapping(address => VotingDelegation) public votingDelegations;
+    mapping(address => address[]) public delegatedBy; // Who delegated to this address
+    mapping(address => uint256) public activeProposalCount;
+    mapping(bytes32 => bool) public executedActions; // Track executed actions
+    
+    // Arrays
+    uint256[] public activeProposalIds;
+    uint256[] public completedProposalIds;
+    
+    // Events
+    event DAOProposalCreated(
+        uint256 indexed proposalId,
+        address indexed proposer,
+        ProposalType proposalType,
+        ProposalUrgency urgency,
+        string title,
+        uint256 votingDeadline
+    );
+    
+    event VoteCastWithReason(
+        uint256 indexed proposalId,
+        address indexed voter,
+        uint8 support, // 0=against, 1=for, 2=abstain
+        uint256 weight,
+        string reason
+    );
+    
+    event ProposalExecuted(
+        uint256 indexed proposalId,
+        bool success,
+        bytes returnData
+    );
+    
+    event ProposalCancelled(
+        uint256 indexed proposalId,
+        string reason
+    );
+    
+    event ProposalVetoed(
+        uint256 indexed proposalId,
+        address indexed vetoer,
+        string reason
+    );
+    
+    event VotingDelegated(
+        address indexed delegator,
+        address indexed delegate,
+        uint256 power
+    );
+    
+    event VotingUndelegated(
+        address indexed delegator,
+        address indexed delegate
+    );
+    
+    event GovernanceConfigUpdated(
+        string parameter,
+        uint256 oldValue,
+        uint256 newValue
+    );
+    
+    // Modifiers
+    modifier onlyTokenHolder() {
+        require(balanceOf(msg.sender) > 0, "Must hold tokens to participate");
+        _;
+    }
+    
+    modifier validProposal(uint256 proposalId) {
+        require(proposalId > 0 && proposalId <= proposalCount, "Invalid proposal ID");
+        _;
+    }
+    
+    modifier proposalActive(uint256 proposalId) {
+        require(daoProposals[proposalId].status == ProposalStatus.Active, "Proposal not active");
+        require(block.timestamp <= daoProposals[proposalId].votingDeadline, "Voting period ended");
+        _;
+    }
+    
+    constructor(
+        string memory _shopName,
+        string memory _location,
+        string memory _description,
+        uint256 _totalValuation,
+        uint256 _tokenizedPercentage,
+        uint256 _initialTokenSupply
+    ) CoffeeShopRWA(_shopName, _location, _description, _totalValuation, _tokenizedPercentage, _initialTokenSupply) {
+        
+        // Initialize governance configuration
+        governanceConfig = GovernanceConfig({
+            proposalThreshold: 100,           // 1% of tokens required
+            quorumThreshold: 1000,            // 10% participation required
+            superMajorityThreshold: 6700,     // 67% for critical decisions
+            vetoThreshold: 7500,              // 75% can emergency veto
+            timeLockDelay: 2 days,            // 2 day execution delay
+            votingDelay: 1 days,              // 1 day before voting starts
+            maxProposalsPerUser: 3,           // Max 3 active proposals per user
+            delegationEnabled: true           // Allow voting delegation
+        });
+    }
+    
+    /**
+     * @dev Create a DAO proposal
+     */
+    function createDAOProposal(
+        ProposalType _type,
+        ProposalUrgency _urgency,
+        string memory _title,
+        string memory _description,
+        string memory _detailsHash,
+        uint256 _requestedAmount,
+        address _targetAddress,
+        bytes memory _callData
+    ) external onlyTokenHolder nonReentrant returns (uint256) {
+        
+        // Check proposal threshold
+        uint256 requiredTokens = (totalSupply() * governanceConfig.proposalThreshold) / 10000;
+        require(getVotingPower(msg.sender) >= requiredTokens, "Insufficient tokens for proposal");
+        require(activeProposalCount[msg.sender] < governanceConfig.maxProposalsPerUser, "Too many active proposals");
+        require(bytes(_title).length > 0, "Title required");
+        require(bytes(_description).length > 0, "Description required");
+        
+        // Validate financial proposals
+        if (_type == ProposalType.Financial && _requestedAmount > 0) {
+            require(_requestedAmount <= address(this).balance, "Insufficient contract balance");
+        }
+        
+        proposalCount++;
+        uint256 votingPeriod = _getVotingPeriod(_urgency);
+        uint256 votingDeadline = block.timestamp + governanceConfig.votingDelay + votingPeriod;
+        uint256 executionDeadline = votingDeadline + governanceConfig.timeLockDelay;
+        
+        // Set quorum based on proposal type
+        uint256 quorum = _getRequiredQuorum(_type);
+        
+        daoProposals[proposalCount] = DAOProposal({
+            id: proposalCount,
+            proposer: msg.sender,
+            proposalType: _type,
+            urgency: _urgency,
+            title: _title,
+            description: _description,
+            detailsHash: _detailsHash,
+            requestedAmount: _requestedAmount,
+            targetAddress: _targetAddress,
+            callData: _callData,
+            createdAt: block.timestamp,
+            votingDeadline: votingDeadline,
+            executionDeadline: executionDeadline,
+            forVotes: 0,
+            againstVotes: 0,
+            abstainVotes: 0,
+            totalVotingPower: totalSupply(),
+            quorumRequired: quorum,
+            executed: false,
+            cancelled: false,
+            vetoed: false,
+            status: ProposalStatus.Active
+        });
+        
+        activeProposalIds.push(proposalCount);
+        activeProposalCount[msg.sender]++;
+        
+        emit DAOProposalCreated(
+            proposalCount,
+            msg.sender,
+            _type,
+            _urgency,
+            _title,
+            votingDeadline
+        );
+        
+        return proposalCount;
+    }
+    
+    /**
+     * @dev Vote on a proposal with reason
+     */
+    function voteWithReason(
+        uint256 proposalId,
+        uint8 support, // 0=against, 1=for, 2=abstain
+        string memory reason
+    ) external validProposal(proposalId) proposalActive(proposalId) nonReentrant {
+        
+        require(support <= 2, "Invalid vote type");
+        require(!hasVotedOnProposal[proposalId][msg.sender], "Already voted");
+        require(block.timestamp >= daoProposals[proposalId].createdAt + governanceConfig.votingDelay, "Voting not started");
+        
+        uint256 weight = getVotingPower(msg.sender);
+        require(weight > 0, "No voting power");
+        
+        DAOProposal storage proposal = daoProposals[proposalId];
+        hasVotedOnProposal[proposalId][msg.sender] = true;
+        votingPowerUsed[proposalId][msg.sender] = weight;
+        
+        if (support == 0) {
+            proposal.againstVotes += weight;
+        } else if (support == 1) {
+            proposal.forVotes += weight;
+        } else {
+            proposal.abstainVotes += weight;
+        }
+        
+        emit VoteCastWithReason(proposalId, msg.sender, support, weight, reason);
+        
+        // Check if proposal can be resolved early
+        _checkEarlyResolution(proposalId);
+    }
+    
+    /**
+     * @dev Execute a successful proposal
+     */
+    function executeProposal(uint256 proposalId) external validProposal(proposalId) nonReentrant {
+        DAOProposal storage proposal = daoProposals[proposalId];
+        require(proposal.status == ProposalStatus.Succeeded || 
+                (block.timestamp > proposal.votingDeadline && _isProposalSuccessful(proposalId)), 
+                "Proposal not ready for execution");
+        require(block.timestamp >= proposal.executionDeadline, "Time lock not expired");
+        require(!proposal.executed, "Already executed");
+        require(!proposal.vetoed, "Proposal vetoed");
+        
+        proposal.executed = true;
+        proposal.status = ProposalStatus.Executed;
+        
+        bool success = true;
+        bytes memory returnData;
+        
+        // Execute based on proposal type
+        if (proposal.proposalType == ProposalType.Financial && proposal.requestedAmount > 0) {
+            (success,) = payable(proposal.targetAddress).call{value: proposal.requestedAmount}("");
+        } else if (proposal.callData.length > 0) {
+            (success, returnData) = proposal.targetAddress.call(proposal.callData);
+        }
+        
+        // Mark action as executed to prevent replay
+        bytes32 actionHash = keccak256(abi.encode(proposalId, proposal.callData));
+        executedActions[actionHash] = true;
+        
+        // Move from active to completed
+        _moveToCompleted(proposalId);
+        activeProposalCount[proposal.proposer]--;
+        
+        emit ProposalExecuted(proposalId, success, returnData);
+    }
+    
+    /**
+     * @dev Emergency veto a proposal (requires super majority)
+     */
+    function vetoProposal(uint256 proposalId, string memory reason) external onlyTokenHolder validProposal(proposalId) {
+        DAOProposal storage proposal = daoProposals[proposalId];
+        require(!proposal.executed, "Cannot veto executed proposal");
+        require(!proposal.vetoed, "Already vetoed");
+        
+        uint256 vetoThreshold = (proposal.totalVotingPower * governanceConfig.vetoThreshold) / 10000;
+        require(getVotingPower(msg.sender) >= vetoThreshold, "Insufficient power for veto");
+        
+        proposal.vetoed = true;
+        proposal.status = ProposalStatus.Vetoed;
+        
+        _moveToCompleted(proposalId);
+        activeProposalCount[proposal.proposer]--;
+        
+        emit ProposalVetoed(proposalId, msg.sender, reason);
+    }
+    
+    /**
+     * @dev Delegate voting power to another address
+     */
+    function delegateVoting(address delegate) external onlyTokenHolder {
+        require(governanceConfig.delegationEnabled, "Delegation disabled");
+        require(delegate != msg.sender, "Cannot delegate to self");
+        require(delegate != address(0), "Invalid delegate");
+        
+        // Remove previous delegation
+        if (votingDelegations[msg.sender].isActive) {
+            _removeDelegation(msg.sender);
+        }
+        
+        uint256 power = balanceOf(msg.sender);
+        votingDelegations[msg.sender] = VotingDelegation({
+            delegate: delegate,
+            delegatedPower: power,
+            delegatedAt: block.timestamp,
+            isActive: true
+        });
+        
+        delegatedBy[delegate].push(msg.sender);
+        
+        emit VotingDelegated(msg.sender, delegate, power);
+    }
+    
+    /**
+     * @dev Remove voting delegation
+     */
+    function undelegateVoting() external {
+        require(votingDelegations[msg.sender].isActive, "No active delegation");
+        
+        address delegate = votingDelegations[msg.sender].delegate;
+        _removeDelegation(msg.sender);
+        
+        emit VotingUndelegated(msg.sender, delegate);
+    }
+    
+    /**
+     * @dev Get effective voting power including delegations
+     */
+    function getVotingPower(address account) public view returns (uint256) {
+        uint256 directPower = balanceOf(account);
+        
+        // If account has delegated their power, they can't vote
+        if (votingDelegations[account].isActive) {
+            directPower = 0;
+        }
+        
+        // Add delegated power from others
+        uint256 delegatedPower = 0;
+        address[] memory delegators = delegatedBy[account];
+        for (uint256 i = 0; i < delegators.length; i++) {
+            if (votingDelegations[delegators[i]].isActive && 
+                votingDelegations[delegators[i]].delegate == account) {
+                delegatedPower += balanceOf(delegators[i]);
+            }
+        }
+        
+        return directPower + delegatedPower;
+    }
+    
+    /**
+     * @dev Get proposal state
+     */
+    function getProposalState(uint256 proposalId) external view validProposal(proposalId) returns (ProposalStatus) {
+        DAOProposal memory proposal = daoProposals[proposalId];
+        
+        if (proposal.vetoed) return ProposalStatus.Vetoed;
+        if (proposal.cancelled) return ProposalStatus.Cancelled;
+        if (proposal.executed) return ProposalStatus.Executed;
+        
+        if (block.timestamp <= proposal.votingDeadline) {
+            return ProposalStatus.Active;
+        }
+        
+        if (_isProposalSuccessful(proposalId)) {
+            return ProposalStatus.Succeeded;
+        } else {
+            return ProposalStatus.Defeated;
+        }
+    }
+    
+    /**
+     * @dev Get all active proposals
+     */
+    function getActiveProposals() external view returns (uint256[] memory) {
+        return activeProposalIds;
+    }
+    
+    /**
+     * @dev Get user's active proposals
+     */
+    function getUserProposals(address user) external view returns (uint256[] memory) {
+        uint256[] memory userProposals = new uint256[](activeProposalCount[user]);
+        uint256 index = 0;
+        
+        for (uint256 i = 0; i < activeProposalIds.length; i++) {
+            uint256 proposalId = activeProposalIds[i];
+            if (daoProposals[proposalId].proposer == user) {
+                userProposals[index] = proposalId;
+                index++;
+            }
+        }
+        
+        return userProposals;
+    }
+    
+    /**
+     * @dev Update governance configuration (only through proposal)
+     */
+    function updateGovernanceConfig(
+        string memory parameter,
+        uint256 newValue
+    ) external {
+        require(msg.sender == address(this), "Only executable through governance");
+        
+        uint256 oldValue;
+        
+        if (keccak256(bytes(parameter)) == keccak256(bytes("proposalThreshold"))) {
+            oldValue = governanceConfig.proposalThreshold;
+            require(newValue <= 1000, "Threshold too high"); // Max 10%
+            governanceConfig.proposalThreshold = newValue;
+        } else if (keccak256(bytes(parameter)) == keccak256(bytes("quorumThreshold"))) {
+            oldValue = governanceConfig.quorumThreshold;
+            require(newValue <= 3000, "Quorum too high"); // Max 30%
+            governanceConfig.quorumThreshold = newValue;
+        } else if (keccak256(bytes(parameter)) == keccak256(bytes("timeLockDelay"))) {
+            oldValue = governanceConfig.timeLockDelay;
+            require(newValue >= 1 hours && newValue <= 30 days, "Invalid delay");
+            governanceConfig.timeLockDelay = newValue;
+        } else {
+            revert("Invalid parameter");
+        }
+        
+        emit GovernanceConfigUpdated(parameter, oldValue, newValue);
+    }
+    
+    // Internal functions
+    function _getVotingPeriod(ProposalUrgency urgency) internal pure returns (uint256) {
+        if (urgency == ProposalUrgency.Emergency) return 1 days;
+        if (urgency == ProposalUrgency.High) return 3 days;
+        if (urgency == ProposalUrgency.Medium) return 7 days;
+        return 14 days; // Low urgency
+    }
+    
+    function _getRequiredQuorum(ProposalType proposalType) internal view returns (uint256) {
+        if (proposalType == ProposalType.Governance || proposalType == ProposalType.Emergency) {
+            return governanceConfig.superMajorityThreshold;
+        }
+        return governanceConfig.quorumThreshold;
+    }
+    
+    function _isProposalSuccessful(uint256 proposalId) internal view returns (bool) {
+        DAOProposal memory proposal = daoProposals[proposalId];
+        
+        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+        uint256 requiredQuorum = (proposal.totalVotingPower * proposal.quorumRequired) / 10000;
+        
+        // Check quorum
+        if (totalVotes < requiredQuorum) return false;
+        
+        // Check majority
+        bool isCritical = proposal.proposalType == ProposalType.Governance || 
+                         proposal.proposalType == ProposalType.Emergency;
+        
+        if (isCritical) {
+            // Super majority required
+            return proposal.forVotes >= (totalVotes * governanceConfig.superMajorityThreshold) / 10000;
+        } else {
+            // Simple majority
+            return proposal.forVotes > proposal.againstVotes;
+        }
+    }
+    
+    function _checkEarlyResolution(uint256 proposalId) internal {
+        DAOProposal storage proposal = daoProposals[proposalId];
+        
+        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+        uint256 requiredQuorum = (proposal.totalVotingPower * proposal.quorumRequired) / 10000;
+        
+        // Early success if overwhelming support
+        if (proposal.forVotes >= (proposal.totalVotingPower * 7500) / 10000) { // 75% of all tokens
+            proposal.status = ProposalStatus.Succeeded;
+            _moveToCompleted(proposalId);
+        }
+        // Early defeat if impossible to reach quorum or majority
+        else if (totalVotes >= requiredQuorum && 
+                 proposal.againstVotes > proposal.forVotes + (proposal.totalVotingPower - totalVotes)) {
+            proposal.status = ProposalStatus.Defeated;
+            _moveToCompleted(proposalId);
+        }
+    }
+    
+    function _moveToCompleted(uint256 proposalId) internal {
+        // Remove from active proposals
+        for (uint256 i = 0; i < activeProposalIds.length; i++) {
+            if (activeProposalIds[i] == proposalId) {
+                activeProposalIds[i] = activeProposalIds[activeProposalIds.length - 1];
+                activeProposalIds.pop();
+                break;
+            }
+        }
+        completedProposalIds.push(proposalId);
+    }
+    
+    function _removeDelegation(address delegator) internal {
+        address delegate = votingDelegations[delegator].delegate;
+        
+        // Remove from delegate's list
+        address[] storage delegators = delegatedBy[delegate];
+        for (uint256 i = 0; i < delegators.length; i++) {
+            if (delegators[i] == delegator) {
+                delegators[i] = delegators[delegators.length - 1];
+                delegators.pop();
+                break;
+            }
+        }
+        
+        // Clear delegation
+        delete votingDelegations[delegator];
+    }
+    
+    // Override token transfer to update delegations
+    function _update(address from, address to, uint256 value) internal override {
+        super._update(from, to, value);
+        
+        // Update delegations when tokens are transferred
+        if (votingDelegations[from].isActive) {
+            votingDelegations[from].delegatedPower = balanceOf(from);
+        }
+        if (votingDelegations[to].isActive) {
+            votingDelegations[to].delegatedPower = balanceOf(to);
+        }
+    }
+}

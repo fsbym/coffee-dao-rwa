@@ -148,7 +148,7 @@ contract CoffeeShopRWAComplete is ERC20, Ownable, ReentrancyGuard {
             isVerified: false
         });
         
-        maxTotalSupply = _initialTokenSupply * 2;
+        maxTotalSupply = _initialTokenSupply * 5;
         tokenPrice = _tokenPrice;
         
         _mint(msg.sender, _initialTokenSupply);
@@ -161,7 +161,7 @@ contract CoffeeShopRWAComplete is ERC20, Ownable, ReentrancyGuard {
         require(_tokenAmount > 0, "Token amount must be positive");
         require(totalSupply() + _tokenAmount <= maxTotalSupply, "Exceeds maximum total supply");
         
-        uint256 totalCost = _tokenAmount * tokenPrice;
+        uint256 totalCost = (_tokenAmount * tokenPrice) / 1e18;
         require(msg.value >= totalCost, "Insufficient ETH sent");
         
         _mint(msg.sender, _tokenAmount);

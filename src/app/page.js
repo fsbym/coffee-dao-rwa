@@ -56,8 +56,7 @@ export default function Home() {
             "Premium artisanal coffee roaster and café serving the North York community",
             ethers.parseEther("937.5"), // 937.5 ETH
             5000, // 50%
-            "",
-            true,
+            true, // isVerified
           ]
         );
 
@@ -86,7 +85,6 @@ export default function Home() {
           "Premium artisanal coffee roaster and café serving the North York community",
           ethers.parseEther("937.5"),
           5000,
-          "",
           true,
         ]);
         setTotalSupply(ethers.parseEther("468750"));
@@ -109,8 +107,30 @@ export default function Home() {
 
     try {
       setBuying(true);
+      
+      // Parse the token amount (user input) to BigInt with 18 decimals
       const tokensToMint = ethers.parseEther(buyAmount);
-      const totalCost = tokenPrice * BigInt(buyAmount);
+      
+      // Calculate total cost exactly like the fixed contract does:
+      // totalCost = (_tokenAmount * tokenPrice) / 1e18
+      // tokensToMint is in wei (1e18), tokenPrice is in wei (0.001e18)
+      // So totalCost = (tokensToMint * tokenPrice) / 1e18
+      const totalCost = (tokensToMint * tokenPrice) / BigInt(10**18);
+
+      console.log("Buying tokens:", {
+        buyAmount,
+        tokensToMint: tokensToMint.toString(),
+        tokenPrice: tokenPrice.toString(),
+        tokenPriceETH: ethers.formatEther(tokenPrice),
+        totalCost: totalCost.toString(),
+        totalCostETH: ethers.formatEther(totalCost),
+        calculationCheck: `${buyAmount} tokens * ${ethers.formatEther(tokenPrice)} ETH = ${ethers.formatEther(totalCost)} ETH`
+      });
+
+      // Ensure totalCost is a valid BigInt and > 0
+      if (totalCost <= 0n) {
+        throw new Error(`Invalid total cost: ${totalCost}`);
+      }
 
       const tx = await writeContract("buyTokens", [tokensToMint], totalCost);
       console.log("Buy tokens transaction:", tx);
@@ -169,36 +189,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Network Status Banner */}
-      {!contractConnected && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-yellow-400"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                <strong>Demo Mode:</strong> Contract not connected. Showing
-                sample data from Brooklyn Roasters Hub.
-                <br />
-                <span className="text-xs">
-                  To see live data: Start Hardhat node and deploy contract.
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -255,7 +245,7 @@ export default function Home() {
               </div>
             </div>
 
-            {assetInfo[6] && (
+            {assetInfo[5] && (
               <div className="mt-4 flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="text-sm text-green-700 font-medium">
@@ -279,7 +269,7 @@ export default function Home() {
                   <span className="text-gray-700">Token Holdings</span>
                 </div>
                 <p className="text-2xl font-bold text-blue-600">
-                  {tokenBalance ? formatEther(tokenBalance) : "0"}
+                  {tokenBalance ? ethers.formatEther(tokenBalance) : "0"}
                 </p>
               </div>
 
@@ -290,7 +280,7 @@ export default function Home() {
                 </div>
                 <p className="text-2xl font-bold text-green-600">
                   {tokenBalance && tokenValue
-                    ? `${formatEther(
+                    ? `${ethers.formatEther(
                         (BigInt(tokenBalance) * BigInt(tokenValue)) /
                           BigInt(10 ** 18)
                       )} ETH`
@@ -305,7 +295,7 @@ export default function Home() {
                 </div>
                 <p className="text-2xl font-bold text-purple-600">
                   {unclaimedDividends
-                    ? `${formatEther(unclaimedDividends)} ETH`
+                    ? `${ethers.formatEther(unclaimedDividends)} ETH`
                     : "0 ETH"}
                 </p>
               </div>

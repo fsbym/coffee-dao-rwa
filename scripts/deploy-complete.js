@@ -20,7 +20,7 @@ async function main() {
   const totalValuation = hre.ethers.parseEther("937.5"); // $1.875M at $2000/ETH
   const tokenizedPercentage = 5000; // 50% (basis points)
   const initialTokenSupply = hre.ethers.parseEther("468.75"); // 50% of valuation in tokens
-  const tokenPrice = hre.ethers.parseEther("0.002"); // 0.002 ETH per token (~$4 per token at $2000/ETH)
+  const tokenPrice = hre.ethers.parseEther("0.001"); // 0.001 ETH per token (~$2 per token at $2000/ETH)
 
   console.log("📊 Deployment Parameters:");
   console.log(`   Shop Name: ${shopName}`);

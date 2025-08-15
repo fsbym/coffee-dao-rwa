@@ -541,8 +541,8 @@
       ]
     },
     "/Users/wangwang6/coffee-dao-rwa/contracts/CoffeeShopRWAComplete.sol": {
-      "lastModificationDate": 1755201176717,
-      "contentHash": "c9bcecaa5ae99f49d62d131431a46ed2",
+      "lastModificationDate": 1755225993509,
+      "contentHash": "81f078f1c33b3097fdccfdcddb6d3fb6",
       "sourceName": "contracts/CoffeeShopRWAComplete.sol",
       "solcConfig": {
         "version": "0.8.20",

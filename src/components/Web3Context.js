@@ -57,10 +57,53 @@ export function Web3ContextProvider({ children }) {
     }
   };
 
+  const switchToSepolia = async () => {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xaa36a7' }], // Sepolia testnet chain ID
+      });
+    } catch (switchError) {
+      // This error code indicates that the chain has not been added to MetaMask
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia Testnet',
+                nativeCurrency: {
+                  name: 'ETH',
+                  symbol: 'ETH',
+                  decimals: 18,
+                },
+                rpcUrls: ['https://rpc.sepolia.org'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              },
+            ],
+          });
+        } catch (addError) {
+          console.error('Failed to add Sepolia network:', addError);
+          throw addError;
+        }
+      } else {
+        console.error('Failed to switch to Sepolia network:', switchError);
+        throw switchError;
+      }
+    }
+  };
+
   const connectWallet = async () => {
     if (!provider) return;
 
     try {
+      // Check and switch to Sepolia network
+      await switchToSepolia();
+
+      // Request account access
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+
       // Get signer
       const web3Signer = await provider.getSigner();
       const address = await web3Signer.getAddress();
@@ -93,28 +136,35 @@ export function Web3ContextProvider({ children }) {
 
   // Contract read functions
   const readContract = async (functionName, args = []) => {
-    if (!contract) {
-      console.warn("Contract not initialized");
-      return null;
-    }
+    // List of Sepolia RPC endpoints to try
+    const rpcEndpoints = [
+      'https://eth-sepolia.g.alchemy.com/v2/0lq3XO8ACaCFnnxPuZIof',
+      'https://rpc.sepolia.org',
+      'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'
+    ];
 
-    try {
-      const result = await contract[functionName](...args);
-      return result;
-    } catch (error) {
-      console.error(`Error reading ${functionName}:`, error);
-
-      // 检查是否是网络连接问题
-      if (error.message.includes("could not decode result data")) {
-        console.error("Contract may not be deployed on current network");
-        console.error("Contract address:", contractAddress);
-        console.error(
-          "Make sure Hardhat local node is running and contract is deployed"
+    for (const rpcUrl of rpcEndpoints) {
+      try {
+        console.log(`Trying RPC: ${rpcUrl.includes('alchemy') ? 'Alchemy' : rpcUrl.includes('infura') ? 'Infura' : 'Public RPC'}`);
+        
+        const sepoliaProvider = new ethers.JsonRpcProvider(rpcUrl);
+        const readOnlyContract = new ethers.Contract(
+          contractAddress,
+          CONTRACT_ABI,
+          sepoliaProvider
         );
-      }
 
-      return null;
+        const result = await readOnlyContract[functionName](...args);
+        console.log(`✅ Successfully called ${functionName} via ${rpcUrl.includes('alchemy') ? 'Alchemy' : 'other RPC'}`);
+        return result;
+      } catch (error) {
+        console.warn(`❌ Failed with ${rpcUrl.includes('alchemy') ? 'Alchemy' : 'other RPC'}:`, error.message);
+        continue; // Try next RPC
+      }
     }
+
+    console.error(`❌ All RPC endpoints failed for ${functionName}`);
+    return null;
   };
 
   // Contract write functions
@@ -123,7 +173,15 @@ export function Web3ContextProvider({ children }) {
 
     try {
       const options = {};
-      if (value) options.value = value;
+      if (value !== null && value !== undefined) {
+        options.value = value;
+      }
+
+      console.log(`Calling ${functionName} with:`, {
+        args,
+        options,
+        valueETH: value ? ethers.formatEther(value) : '0'
+      });
 
       const tx = await contract[functionName](...args, options);
       return tx;
